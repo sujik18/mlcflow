@@ -128,6 +128,55 @@ def compare_versions(current_version, min_version):
     except Exception as e:
         raise ValueError(f"Invalid version format: {e}")
 
+def run_system_cmd(i):
+    """
+    Execute a system command in a specified path.
+
+    Args:
+        i (dict): A dictionary containing:
+            - 'path' (str): The directory to run the command in.
+            - 'cmd' (str): The system command to execute.
+
+    Returns:
+        dict: A dictionary with the result of the execution:
+            - {'return': 0, 'output': <command_output>} on success.
+            - {'return': 1, 'error': <error_message>} on failure.
+    """
+    # Extract path and cmd from the input dictionary
+    path = i.get('path', '.')
+    cmd = i.get('cmd', '')
+
+    if not cmd:
+        return {'return': 1, 'error': 'No command provided to execute.'}
+
+    if not os.path.exists(path):
+        return {'return': 1, 'error': f"Specified path does not exist: '{path}'"}
+
+    # Change to the specified path and execute the command
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=path,
+            shell=True,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        return {
+            'return': 0,
+            'output': result.stdout.strip(),
+            'error_output': result.stderr.strip()
+        }
+    except subprocess.CalledProcessError as e:
+        return {
+            'return': 1,
+            'error': f"Command execution failed with error code {e.returncode}.",
+            'error_output': e.stderr.strip()
+        }
+    except Exception as e:
+        return {'return': 1, 'error': f"Unexpected error occurred: {str(e)}"}
+
 '''
 def load_txt(file_name, remove_after_read=False, check_if_exists=True):
     """

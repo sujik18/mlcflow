@@ -158,15 +158,19 @@ class Action:
         res = self.access({'action': 'load',
                             'automation': 'cfg,88dce9c160324c5d',
                             'item': 'default'})
-        if res['return'] > 0:
-            return res
-        mlc_local_repo_path = os.path.join(self.repos_path, self.cfg['MLC_LOCAL_REPO_FOLDER'])
+        #if res['return'] > 0:
+        #    return res
+        if self.cfg:
+            mlc_local_repo_path = os.path.join(self.repos_path, self.cfg.get('MLC_LOCAL_REPO_FOLDER', 'local'))
+        else:
+            mlc_local_repo_path = os.path.join(self.repos_path, 'local')
         self.local_cache_path = os.path.join(mlc_local_repo_path, "cache")
         if not os.path.exists(self.local_cache_path):
             os.makedirs(self.local_cache_path, exist_ok=True)
         self.repos = self.load_repos_and_meta()
         #logger.info(f"In Action class: {self.repos_path}")
         self.index = Index(self.repos_path, self.repos)
+
 
         #self.repos = {
         #'lst': repo_paths
@@ -225,7 +229,7 @@ class Action:
             return res
 
         # Determine paths and metadata format
-        repo_path = res["path"]
+        repo_path = res["list"][0].path
         repo_meta = {
                 'alias': item_repo[0],
                 'uid' : item_repo[1],
@@ -657,13 +661,24 @@ class Automation:
 class RepoAction(Action):
 
     def find(self, args):
-        repo = args.get('item')
-        repo_uid = repo.split(",")[1]
+        if isinstance(args, dict):
+            repo = args.get('item', args.get('artifact'))
+        else:
+            repo = args.details
+        repo_split = repo.split(",")
+        if len(repo_split) > 1:
+            repo_uid = repo_split[1]
+        repo_name = repo_split[0]
+
+        lst = []
         #print(f"args = {args}")
         for i in self.repos:
-            if i.meta['uid'] == repo_uid:
-                return {'return': 0, 'path': i.path}
-        return {'return': 1, 'error': f'No repo found for uid {repo_uid}'}
+            if repo_uid and i.meta['uid'] == repo_uid:
+                lst.append(i)
+            elif repo_name == i.meta['alias']:
+                lst.append(i)
+                
+        return {'return': 0, 'list': lst}
 
     def github_url_to_user_repo_format(self, url):
         """
@@ -934,7 +949,6 @@ def access(i):
     automation = i['automation']
     action_class = get_action(automation)
     r = action_class.access(i)
-        
     return r
 
 # Main CLI function
