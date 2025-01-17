@@ -738,6 +738,14 @@ class RepoAction(Action):
             
     def list(self, args):
         logger.info("Listing all repositories.")
+        print("\nRepositories:")
+        print("-------------")
+        for repo_object in self.repos:
+            print(f"- Alias: {repo_object.meta.get('alias', 'Unknown')}")
+            print(f"  Path:  {repo_object.path}\n")
+        print("-------------")
+        logger.info("Repository listing ended")
+        
 
 class ScriptAction(Action):
 
