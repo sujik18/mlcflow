@@ -89,6 +89,7 @@ def load_txt(file_name, check_if_exists=False, split=False, match_text=None, fai
         result = {'return': 0}
         if split:
             result['string'] = content.splitlines()
+            result['list'] = result['string']
         else:
             result['string'] = content
         
@@ -99,6 +100,82 @@ def load_txt(file_name, check_if_exists=False, split=False, match_text=None, fai
 
     except Exception as e:
         return {'return': 1, 'error': str(e)}
+
+def compare_versions(current_version, min_version):
+    """
+    Compare two semantic version strings.
+
+    Args:
+        current_version (str): The current version string (e.g., "1.2.3").
+        min_version (str): The minimum required version string (e.g., "1.0.0").
+
+    Returns:
+        int: -1 if current_version < min_version,
+             0 if current_version == min_version,
+             1 if current_version > min_version.
+    """
+    try:
+        # Use `packaging.version` to handle semantic version comparison
+        current = version.parse(current_version)
+        minimum = version.parse(min_version)
+
+        if current < minimum:
+            return -1
+        elif current > minimum:
+            return 1
+        else:
+            return 0
+    except Exception as e:
+        raise ValueError(f"Invalid version format: {e}")
+
+def run_system_cmd(i):
+    """
+    Execute a system command in a specified path.
+
+    Args:
+        i (dict): A dictionary containing:
+            - 'path' (str): The directory to run the command in.
+            - 'cmd' (str): The system command to execute.
+
+    Returns:
+        dict: A dictionary with the result of the execution:
+            - {'return': 0, 'output': <command_output>} on success.
+            - {'return': 1, 'error': <error_message>} on failure.
+    """
+    # Extract path and cmd from the input dictionary
+    path = i.get('path', '.')
+    cmd = i.get('cmd', '')
+
+    if not cmd:
+        return {'return': 1, 'error': 'No command provided to execute.'}
+
+    if not os.path.exists(path):
+        return {'return': 1, 'error': f"Specified path does not exist: '{path}'"}
+
+    # Change to the specified path and execute the command
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=path,
+            shell=True,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        return {
+            'return': 0,
+            'output': result.stdout.strip(),
+            'error_output': result.stderr.strip()
+        }
+    except subprocess.CalledProcessError as e:
+        return {
+            'return': 1,
+            'error': f"Command execution failed with error code {e.returncode}.",
+            'error_output': e.stderr.strip()
+        }
+    except Exception as e:
+        return {'return': 1, 'error': f"Unexpected error occurred: {str(e)}"}
 
 '''
 def load_txt(file_name, remove_after_read=False, check_if_exists=True):
@@ -209,8 +286,22 @@ def merge_dicts(params, in_place=True):
             elif isinstance(existing_value, list) and isinstance(value, list):
                 if append_lists:
                     if append_unique:
-                        # Append only unique values from the second list
-                        merged_dict[key] = list(set(existing_value + value))
+                        # Combine dictionaries uniquely based on their key-value pairs
+                        seen = set()
+                        merged_list = []
+                        for item in existing_value + value:
+                            if isinstance(item, dict):
+                                try:
+                                    item_frozenset = frozenset(item.items())
+                                except TypeError:
+                                    item_frozenset = id(item)
+                            else:
+                                item_frozenset = item
+                            if item_frozenset not in seen:
+                                seen.add(item_frozenset)
+                                merged_list.append(item)
+                        merged_dict[key] = merged_list
+                    
                     else:
                         # Simply append the values
                         merged_dict[key] = existing_value + value
