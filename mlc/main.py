@@ -160,9 +160,10 @@ class Action:
                             'item': 'default'})
         if res['return'] > 0:
             return res
-        mlc_local_cache_path = os.path.join(self.repos_path, self.cfg['MLC_LOCAL_CACHE_FOLDER'])
-        if not os.path.exists(mlc_local_cache_path):
-            os.makedirs(mlc_local_cache_path, exist_ok=True)
+        mlc_local_repo_path = os.path.join(self.repos_path, self.cfg['MLC_LOCAL_REPO_FOLDER'])
+        self.local_cache_path = os.path.join(mlc_local_repo_path, "cache")
+        if not os.path.exists(self.local_cache_path):
+            os.makedirs(self.local_cache_path, exist_ok=True)
         self.repos = self.load_repos_and_meta()
         #logger.info(f"In Action class: {self.repos_path}")
         self.index = Index(self.repos_path, self.repos)
@@ -232,7 +233,7 @@ class Action:
         target_name = i.get('target_name', self.action_type)
         target_path = os.path.join(repo_path, target_name)
         if target_name == "cache":
-            folder_name = f"""{i["script_alias"]}_{item_name or item_id[:6]}""" if i.get("script_alias") else item_name or item_id
+            folder_name = f"""{i["script_alias"]}_{item_name or item_id[:8]}""" if i.get("script_alias") else item_name or item_id
         else:
             folder_name = item_name or item_id
 
@@ -265,7 +266,7 @@ class Action:
         if save_result["return"] > 0:
             return save_result
     
-        self.index.add(item_meta, self.action_type, item_path, repo_meta, repo_path)
+        self.index.add(item_meta, target_name, item_path, repo_meta, repo_path)
 
         return {
             "return": 0,
@@ -288,7 +289,10 @@ class Action:
             dict: Return code and message.
         """
         # Step 1: Search for items based on input tags
+        target_name = i.get('target_name',"cache")
+        i['target_name'] = target_name
         ii = i.copy()
+
         if i.get('search_tags'):
             ii['tags'] = ",".join(i['search_tags'])
         search_result = self.search(ii)
@@ -297,8 +301,6 @@ class Action:
 
         found_items = search_result['list']
         if not found_items:
-            if not i.get('target_name'):
-                i['target_name'] = "cache"
             res = self.add(i)
             if res['return'] > 0 :
                 return res
@@ -343,6 +345,9 @@ class Action:
             #print(f"item.meta = {item.meta}, saved_meta = {saved_meta}")
             save_result = utils.save_json(item_meta_path, meta=meta)
             #print(f"item_meta = {item.meta}, path = {item.path}")
+            #print(item.repo_path)
+            #return {'return': 1}
+            self.index.update(meta, target_name, item.path, item.repo_meta, item.repo_path)
 
         return {'return': 0, 'message': f"Tags updated successfully for {len(found_items)} item(s).", 'list': found_items }
 
@@ -350,7 +355,8 @@ class Action:
 
     def search(self, i):
         indices = self.index.indices
-        target_index = indices.get(self.action_type)
+        target = i.get('target_name', self.action_type)
+        target_index = indices.get(target)
         result = []
         uid = i.get("uid")
         if target_index:
@@ -362,8 +368,9 @@ class Action:
             else:
                 tags= i.get("tags")
                 tags_split = tags.split(",")
-                n_tags = [p for p in tags_split if p.startswith("-")]
-                p_tags = list(set(tags_split) - set(n_tags))
+                n_tags_ = [p for p in tags_split if p.startswith("-")]
+                n_tags = [p[1:] for p in n_tags_]
+                p_tags = list(set(tags_split) - set(n_tags_))
                 for res in target_index:
                     c_tags = res["tags"]
                     if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
@@ -404,6 +411,29 @@ class Index:
                     "path": path,
                     "repo": {"uid": repo_meta['uid'], "alias": repo_meta['alias'], "path": repo_path}
                 })
+
+    def get_index(self, folder_type, uid):
+        for index in range(len(self.indices[folder_type])):
+            if self.indices[folder_type][index]["uid"] == uid:
+                return index
+        return -1
+
+    def update(self, meta, folder_type, path, repo_meta, repo_path):
+        uid = meta['uid']
+        alias = meta['alias']
+        tags = meta['tags']
+        index = self.get_index(folder_type, uid)
+        if index == -1: #add it
+            self.add(meta, folder_type, path, repo_meta, repo_path)
+            logger.debug(f"Index update failed, new index created for {uid}")
+        else:
+            self.indices[folder_type][index] = {
+                    "uid": uid,
+                    "tags": tags,
+                    "alias": alias,
+                    "path": path,
+                    "repo": {"uid": repo_meta['uid'], "alias": repo_meta['alias'], "path": repo_path}
+                }
 
     def build_index(self):
         """
@@ -890,6 +920,15 @@ def get_action(target):
     action_class = actions.get(target, None)
     return action_class() if action_class else None
 
+
+def access(i):
+    action = i['action']
+    automation = i['automation']
+    action_class = get_action(automation)
+    r = action_class.access(i)
+        
+    return r
+
 # Main CLI function
 def main():
     parser = argparse.ArgumentParser(prog='mlc', description='A CLI tool for managing repos, scripts, and caches.')
@@ -916,11 +955,8 @@ def main():
 
     for action in ['load']:
         load_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
-        load_parser.add_argument('target', choices=['utils', 'cfg'], help='Target type (utils, cfg).')
+        load_parser.add_argument('target', choices=['cfg'], help='Target type (cfg).')
     
-    for action in [ 'get_host_os_info']:
-        utils_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
-        utils_parser.add_argument('target', choices=['utils'], help='Target type (utils).')
     
     # Parse arguments
     args = parser.parse_args()
@@ -958,9 +994,7 @@ def main():
                 logger.info(f"Error: '{args.target_or_url}' is not a valid target for pull.")
     else:
         # Get the action handler for other commands
-        logger.info(f"Going for action = {args.target}")
         action = get_action(args.target)
-        logger.info(f"Got action = {action}")
         # Dynamically call the method (e.g., run, list, show)
         if action and hasattr(action, args.command):
             method = getattr(action, args.command)

@@ -89,6 +89,7 @@ def load_txt(file_name, check_if_exists=False, split=False, match_text=None, fai
         result = {'return': 0}
         if split:
             result['string'] = content.splitlines()
+            result['list'] = result['string']
         else:
             result['string'] = content
         
@@ -209,8 +210,22 @@ def merge_dicts(params, in_place=True):
             elif isinstance(existing_value, list) and isinstance(value, list):
                 if append_lists:
                     if append_unique:
-                        # Append only unique values from the second list
-                        merged_dict[key] = list(set(existing_value + value))
+                        # Combine dictionaries uniquely based on their key-value pairs
+                        seen = set()
+                        merged_list = []
+                        for item in existing_value + value:
+                            if isinstance(item, dict):
+                                try:
+                                    item_frozenset = frozenset(item.items())
+                                except TypeError:
+                                    item_frozenset = id(item)
+                            else:
+                                item_frozenset = item
+                            if item_frozenset not in seen:
+                                seen.add(item_frozenset)
+                                merged_list.append(item)
+                        merged_dict[key] = merged_list
+                    
                     else:
                         # Simply append the values
                         merged_dict[key] = existing_value + value
