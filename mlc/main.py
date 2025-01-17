@@ -229,9 +229,10 @@ class Action:
                 'alias': item_repo[0],
                 'uid' : item_repo[1],
                 }
-        target_path = os.path.join(repo_path, self.action_type)
-        if self.action_type == "cache1":
-            folder_name = f"""{i["script_alias"]}_{item_name or item_id}""" if i.get("script_alias") else item_name or item_id
+        target_name = i.get('target_name', self.action_type)
+        target_path = os.path.join(repo_path, target_name)
+        if target_name == "cache":
+            folder_name = f"""{i["script_alias"]}_{item_name or item_id[:6]}""" if i.get("script_alias") else item_name or item_id
         else:
             folder_name = item_name or item_id
 
@@ -296,6 +297,8 @@ class Action:
 
         found_items = search_result['list']
         if not found_items:
+            if not i.get('target_name'):
+                i['target_name'] = "cache"
             res = self.add(i)
             if res['return'] > 0 :
                 return res
