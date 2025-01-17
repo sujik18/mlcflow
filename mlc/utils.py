@@ -101,6 +101,33 @@ def load_txt(file_name, check_if_exists=False, split=False, match_text=None, fai
     except Exception as e:
         return {'return': 1, 'error': str(e)}
 
+def compare_versions(current_version, min_version):
+    """
+    Compare two semantic version strings.
+
+    Args:
+        current_version (str): The current version string (e.g., "1.2.3").
+        min_version (str): The minimum required version string (e.g., "1.0.0").
+
+    Returns:
+        int: -1 if current_version < min_version,
+             0 if current_version == min_version,
+             1 if current_version > min_version.
+    """
+    try:
+        # Use `packaging.version` to handle semantic version comparison
+        current = version.parse(current_version)
+        minimum = version.parse(min_version)
+
+        if current < minimum:
+            return -1
+        elif current > minimum:
+            return 1
+        else:
+            return 0
+    except Exception as e:
+        raise ValueError(f"Invalid version format: {e}")
+
 '''
 def load_txt(file_name, remove_after_read=False, check_if_exists=True):
     """
