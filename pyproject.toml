@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlcflow"
+version = "0.1.0"
+description = "An automation interface for ML applications"
+authors = [
+    { name = "MLCommons", email = "systems@mlcommons.org" }
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["mlc", "mlcflow", "pypi", "package", "automation"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "requests"
+]
+
+[project.urls]
+Homepage = "https://github.com/mlcommons/mlcflow"
+Documentation = "https://docs.mlcommons.org/mlcflow"
+Repository = "https://github.com/mlcommons/mlcflow"
+Issues = "https://github.com/mlcommons/mlcflow/issues"
+
+[tool.setuptools]
+packages = ["mlc"]
+
+[project.scripts]
+mlc = "mlc.main:main"
+cm = "mlc.main:main"
