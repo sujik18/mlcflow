@@ -1,4 +1,4 @@
-MLC_LOCAL_CACHE_FOLDER: local
+MLC_LOCAL_REPO_FOLDER: local
 local_repo_meta:
   alias: local
   uid: 9a3280b14a4285c9
