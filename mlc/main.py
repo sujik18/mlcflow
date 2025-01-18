@@ -920,7 +920,7 @@ class CfgAction(Action):
             args (dict): Contains the configuration details such as file path, etc.
         """
         #logger.info("In cfg load")
-        default_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'config.yaml')
+        default_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
         config_file = args.get('config_file', default_config_path)
         logger.info(f"In cfg load, config file = {config_file}")
         if not config_file or not os.path.exists(config_file):
