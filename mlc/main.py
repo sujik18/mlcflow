@@ -10,6 +10,7 @@ import sys
 import logging
 from types import SimpleNamespace
 import mlc.utils as utils
+from pathlib import Path
 
 # Set up logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -189,8 +190,16 @@ class Action:
         if res['return'] > 0:
             return res
         mlc_local_cache_path = os.path.join(self.repos_path, self.cfg['MLC_LOCAL_CACHE_FOLDER'])
+        mlc_local_cache_path_expanded = Path(mlc_local_cache_path).expanduser().resolve()
+
         if not os.path.exists(mlc_local_cache_path):
             os.makedirs(mlc_local_cache_path, exist_ok=True)
+            repo_json_path = os.path.join(os.path.dirname(self.repos_path), "repos.json")
+            if not os.path.exists(repo_json_path):
+                with open(repo_json_path, 'w') as f:
+                    json.dump([str(mlc_local_cache_path_expanded)], f, indent=2)
+                    logger.info(f"Created repos.json in {os.path.dirname(self.repos_path)} and initialised with local cache folder path: {mlc_local_cache_path}")
+
         self.repos = self.load_repos_and_meta()
         #logger.info(f"In Action class: {self.repos_path}")
         self.index = Index(self.repos_path, self.repos)
