@@ -11,8 +11,28 @@ import logging
 import mlc.utils as utils
 
 # Set up logging configuration
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+def setup_logging():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+    
+    logFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Seting Default file value for logging
+    log_file = 'mlc-log.txt'
+    
+    # File hander for logging in file in the current directory
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(logFormatter)
+    logger.addHandler(file_handler)
+    
+    # Console handler for logging on console
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(logFormatter)
+    logger.addHandler(consoleHandler)
+
+# Testing the logging    
+# setup_logging()
+# logger = logging.getLogger(__name__)
+# logger.info('This is an info message')
 
 # Base class for CLI actions
 class Action:
