@@ -194,13 +194,18 @@ class Action:
             mlc_local_repo_path = os.path.join(self.repos_path, self.cfg.get('MLC_LOCAL_REPO_FOLDER', 'local'))
         else:
             mlc_local_repo_path = os.path.join(self.repos_path, 'local')
+        
+        mlc_local_repo_path_expanded = Path(mlc_local_repo_path).expanduser().resolve()
+
         if not os.path.exists(mlc_local_repo_path):
             os.makedirs(mlc_local_repo_path, exist_ok=True)
-            repo_json_path = os.path.join(os.path.dirname(self.repos_path), "repos.json")
-            if not os.path.exists(repo_json_path):
-                with open(repo_json_path, 'w') as f:
-                    json.dump([str(mlc_local_cache_path_expanded)], f, indent=2)
-                    logger.info(f"Created repos.json in {os.path.dirname(self.repos_path)} and initialised with local cache folder path: {mlc_local_cache_path}")
+        
+        # TODO: what if user changes the mlc local repo path in between
+        repo_json_path = os.path.join(self.repos_path, "repos.json")
+        if not os.path.exists(repo_json_path):
+            with open(repo_json_path, 'w') as f:
+                json.dump([str(mlc_local_repo_path_expanded)], f, indent=2)
+                logger.info(f"Created repos.json in {os.path.dirname(self.repos_path)} and initialised with local cache folder path: {mlc_local_repo_path}")
 
         self.local_cache_path = os.path.join(mlc_local_repo_path, "cache")
         if not os.path.exists(self.local_cache_path):
