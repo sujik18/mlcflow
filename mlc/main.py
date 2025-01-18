@@ -790,8 +790,32 @@ class ScriptAction(Action):
     def update_script_run_args(self, run_args, inp):
         for key in inp:
             if "=" in key:
-                split = key.split("=")
-                run_args[split[0].strip("-")] = split[1]
+                split = key.split("=", 1)  # Split only on the first "="
+                arg_key = split[0].strip("-")
+                arg_value = split[1]
+
+                # Handle lists: Only if "," is immediately before the "="
+                if "," in arg_key:
+                    list_key, list_values = arg_key.rsplit(",", 1)
+                    if not list_values:  # Ensure "=" follows the last comma
+                        run_args[list_key] = arg_value.split(",")
+                        continue
+
+                # Handle dictionaries: `--adr.compiler.tags=gcc` becomes `{"adr": {"compiler": {"tags": "gcc"}}}`
+                elif "." in arg_key:
+                    keys = arg_key.split(".")
+                    current = run_args
+                    for part in keys[:-1]:
+                        if part not in current or not isinstance(current[part], dict):
+                            current[part] = {}
+                        current = current[part]
+                    current[keys[-1]] = arg_value
+            
+                # Handle simple key-value pairs
+                else:
+                    run_args[arg_key] = arg_value
+        
+            # Handle flags: `--flag` becomes `{"flag": True}`
             elif key.startswith("-"):
                 run_args[key.strip("-")] = True
 
@@ -826,8 +850,9 @@ class ScriptAction(Action):
         # Check if ScriptAutomation is defined in the module
         if hasattr(module, 'ScriptAutomation'):
             automation_instance = module.ScriptAutomation(self, module_path)
-            logger.info(f" script automation initialized at {module_path}")
+            #logger.info(f" script automation initialized at {module_path}")
             #logger.info(run_args)
+            #return {'return': 1}
             result = automation_instance.run(run_args)  # Pass args to the run method
             #logger.info(result)
             if result['return'] > 0:
@@ -895,7 +920,8 @@ class CfgAction(Action):
             args (dict): Contains the configuration details such as file path, etc.
         """
         #logger.info("In cfg load")
-        config_file = args.get('config_file', 'config.yaml')
+        default_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'config.yaml')
+        config_file = args.get('config_file', default_config_path)
         logger.info(f"In cfg load, config file = {config_file}")
         if not config_file or not os.path.exists(config_file):
             logger.info(f"Error: Configuration file '{config_file}' not found.")
