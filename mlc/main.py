@@ -197,6 +197,11 @@ class Action:
         if not os.path.exists(mlc_local_repo_path):
             os.makedirs(mlc_local_repo_path, exist_ok=True)
         
+        if not os.path.isfile(os.path.join(mlc_local_repo_path, "meta.yaml")):
+            local_repo_meta = {"alias": "local", "name": "MLC local repository", "uid": utils.get_new_uid()['uid']}
+            with open(os.path.join(mlc_local_repo_path, "meta.yaml"), "w") as json_file:
+                json.dump(local_repo_meta, json_file, indent=4)
+        
         # TODO: what if user changes the mlc local repo path in between
         repo_json_path = os.path.join(self.repos_path, "repos.json")
         if not os.path.exists(repo_json_path):
