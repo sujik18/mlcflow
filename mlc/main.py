@@ -8,7 +8,9 @@ import json
 import yaml
 import sys
 import logging
+from types import SimpleNamespace
 import mlc.utils as utils
+from pathlib import Path
 
 # Set up logging configuration
 def setup_logging(log_path = '.\mlc',log_file = 'mlc-log.txt'):
@@ -102,8 +104,7 @@ class Action:
 
     def load_repos_and_meta(self):
         repos_list = []
-        repos_file_dir = os.path.dirname(self.repos_path)
-        repos_file_path = os.path.join(repos_file_dir, 'repos.json')
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
 
         # Read the JSON file line by line
         try:
@@ -127,19 +128,19 @@ class Action:
             if not repo_path:
                 continue
 
-            cmr_yaml_path = os.path.join(repo_path, "cmr.yaml")
+            meta_yaml_path = os.path.join(repo_path, "meta.yaml")
 
-            # Check if cmr.yaml exists
-            if not os.path.isfile(cmr_yaml_path):
-                logger.info(f"Warning: {cmr_yaml_path} not found. Skipping...")
+            # Check if meta.yaml exists
+            if not os.path.isfile(meta_yaml_path):
+                logger.info(f"Warning: {meta_yaml_path} not found. Skipping...")
                 continue
 
             # Load the YAML file
             try:
-                with open(cmr_yaml_path, 'r') as yaml_file:
+                with open(meta_yaml_path, 'r') as yaml_file:
                     meta = yaml.safe_load(yaml_file)
             except yaml.YAMLError as e:
-                logger.info(f"Error loading YAML in {cmr_yaml_path}: {e}")
+                logger.info(f"Error loading YAML in {meta_yaml_path}: {e}")
                 continue
 
             # Create a Repo object and add it to the list
@@ -149,9 +150,9 @@ class Action:
         return repos_list
 
     def load_repos(self):
+        # todo: what if the repo is already found in the repos folder but not registered and we pull the same repo
         # Get the path to the repos.json file in $HOME/MLC
-        repos_file_dir = os.path.dirname(self.repos_path)
-        repos_file_path = os.path.join(repos_file_dir, 'repos.json')
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
 
         # Check if the file exists
         if not os.path.exists(repos_file_path):
@@ -169,6 +170,31 @@ class Action:
         except Exception as e:
             logger.info(f"Error reading file: {e}")
             return None
+    
+    def conflicting_repo(self, repo_meta):
+        for repo_object in self.repos:
+            if repo_object.meta.get('uid', '') == '':
+                return {"return": 1, "error": f"UID is not present in file 'meta.yaml' in the repo path {repo_object.path}"}
+            if repo_meta["uid"] == repo_object.meta.get('uid', ''):
+                return {"return": 1, "error": f"Can not register repo as it's conflicting with repo in the path {repo_object.path}"}
+        return {"return": 0}
+    
+    def register_repo(self, repo_meta):
+        # Get the path to the repos.json file in $HOME/MLC
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
+
+        with open(repos_file_path, 'r') as f:
+            repos_list = json.load(f)
+        
+        new_repo_path = repo_meta.get('path')
+        if new_repo_path and new_repo_path not in repos_list:
+            repos_list.append(new_repo_path)
+            logger.info(f"Added new repo path: {new_repo_path}")
+
+        with open(repos_file_path, 'w') as f:
+            json.dump(repos_list, f, indent=2)
+            logger.info(f"Updated repos.json at {repos_file_path}")
+
 
     def __init__(self):        
         self.logger = logging.getLogger()
@@ -176,15 +202,35 @@ class Action:
         res = self.access({'action': 'load',
                             'automation': 'cfg,88dce9c160324c5d',
                             'item': 'default'})
+        
         #if res['return'] > 0:
         #    return res
         if self.cfg:
             mlc_local_repo_path = os.path.join(self.repos_path, self.cfg.get('MLC_LOCAL_REPO_FOLDER', 'local'))
         else:
             mlc_local_repo_path = os.path.join(self.repos_path, 'local')
+        
+        mlc_local_repo_path_expanded = Path(mlc_local_repo_path).expanduser().resolve()
+
+        if not os.path.exists(mlc_local_repo_path):
+            os.makedirs(mlc_local_repo_path, exist_ok=True)
+        
+        if not os.path.isfile(os.path.join(mlc_local_repo_path, "meta.yaml")):
+            local_repo_meta = {"alias": "local", "name": "MLC local repository", "uid": utils.get_new_uid()['uid']}
+            with open(os.path.join(mlc_local_repo_path, "meta.yaml"), "w") as json_file:
+                json.dump(local_repo_meta, json_file, indent=4)
+        
+        # TODO: what if user changes the mlc local repo path in between
+        repo_json_path = os.path.join(self.repos_path, "repos.json")
+        if not os.path.exists(repo_json_path):
+            with open(repo_json_path, 'w') as f:
+                json.dump([str(mlc_local_repo_path_expanded)], f, indent=2)
+                logger.info(f"Created repos.json in {os.path.dirname(self.repos_path)} and initialised with local cache folder path: {mlc_local_repo_path}")
+
         self.local_cache_path = os.path.join(mlc_local_repo_path, "cache")
         if not os.path.exists(self.local_cache_path):
             os.makedirs(self.local_cache_path, exist_ok=True)
+
         self.repos = self.load_repos_and_meta()
         #logger.info(f"In Action class: {self.repos_path}")
         self.index = Index(self.repos_path, self.repos)
@@ -598,9 +644,9 @@ class Item:
         self._load_meta()
 
     def _load_repo_meta(self):
-        yaml_file = os.path.join(self.repo_path, "cmr.yaml")
+        yaml_file = os.path.join(self.repo_path, "meta.yaml")
 
-        json_file = os.path.join(self.repo_path, "cmr.json")
+        json_file = os.path.join(self.repo_path, "meta.json")
 
         if os.path.exists(yaml_file):
             self.repo_meta = utils.read_yaml(yaml_file)
@@ -754,6 +800,69 @@ class RepoAction(Action):
                     clone_command = ['git', 'clone', '--branch', branch, repo_url, repo_path]
                 
                 subprocess.run(clone_command, check=True)
+
+                meta_file_path = os.path.join(repo_path, 'meta.yaml')
+                if not os.path.exists(meta_file_path):
+                    logger.warning(f"meta.yaml not found in {repo_path}. Repo pulled but not register in mlc repos. Skipping...")
+                    return
+                
+                with open(meta_file_path, 'r') as meta_file:
+                    meta_data = yaml.safe_load(meta_file)
+                    meta_data["path"] = repo_path
+
+                # Check UID conflicts
+                is_conflict = self.conflicting_repo(meta_data)
+                if is_conflict['return'] > 0:
+                    if "UID not present" in is_conflict['error']:
+                        logger.warning(f"UID not found in meta.yaml at {repo_path}. Repo pulled but can not register in mlc repos. Skipping...")
+                        return
+                    else:
+                        logger.warning(f"{is_conflict['error']} Repo pulled but can not register in mlc repos. Skipping...")
+                        return
+                    
+                self.register_repo(meta_data)
+
+
+                #recursive cloning of the dependency repo still to be done
+
+                # dependencies = cmr_data.get('deps', [])
+                # for dep in dependencies:
+                #     dep_alias = dep.get('alias')
+                #     dep_uid = dep.get('uid')
+                #     if not dep_alias or not dep_uid:
+                #         logger.warning(f"Skipped a invalid dependency from {repo_name}")  # Skip invalid dependencies
+                #         continue
+
+                #     is_conflict = self.conflicting_repo({"uid": dep_uid})
+
+                #     # Check if the  dependency repo is already present. If yes then no need to clone again.
+                #     if is_conflict['return'] > 0:
+                #         if "conflicting" in is_conflict["error"]:
+                #             logger.warning(f"The {dep_alias} repo is not cloned as it is already registered in mlc repo")
+                #             continue
+                    
+                #     dep_args = args
+                #     dep_args.details = dep_alias
+
+                #     # call the function recursively
+                #     res = self.access({'action': 'pull',
+                #                 'automation': 'repo',
+                #                 'target_or_url': dep_alias,
+                #                 'details': dep_alias,
+                #                 'extra': args.extra})
+                #     if res['return'] > 0:
+                #         return res
+                    # self.pull(dep_args)
+
+
+
+                    
+
+                # res = self.access({'action': 'pull',
+                #             'automation': 'repo',
+                #             'item': 'default'})
+                # if res['return'] > 0:
+                #     return res
             else:
                 logger.info(f"Repository {repo_name} already exists at {repo_path}. Pulling latest changes...")
                 subprocess.run(['git', '-C', repo_path, 'pull'], check=True)
@@ -778,6 +887,11 @@ class RepoAction(Action):
             print(f"  Path:  {repo_object.path}\n")
         print("-------------")
         logger.info("Repository listing ended")
+    
+    def rm(self, args):
+        # to be done
+        logger.info("Remove the repositories")
+        logger.info("WARNING: Function yet to be completed!")
         
 
 class ScriptAction(Action):
@@ -938,7 +1052,7 @@ class CfgAction(Action):
             args (dict): Contains the configuration details such as file path, etc.
         """
         #logger.info("In cfg load")
-        default_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'config.yaml')
+        default_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
         config_file = args.get('config_file', default_config_path)
         logger.info(f"In cfg load, config file = {config_file}")
         if not config_file or not os.path.exists(config_file):
