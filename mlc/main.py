@@ -176,14 +176,19 @@ class Action:
         res = self.access({'action': 'load',
                             'automation': 'cfg,88dce9c160324c5d',
                             'item': 'default'})
-        if res['return'] > 0:
-            return res
-        mlc_local_cache_path = os.path.join(self.repos_path, self.cfg['MLC_LOCAL_CACHE_FOLDER'])
-        if not os.path.exists(mlc_local_cache_path):
-            os.makedirs(mlc_local_cache_path, exist_ok=True)
+        #if res['return'] > 0:
+        #    return res
+        if self.cfg:
+            mlc_local_repo_path = os.path.join(self.repos_path, self.cfg.get('MLC_LOCAL_REPO_FOLDER', 'local'))
+        else:
+            mlc_local_repo_path = os.path.join(self.repos_path, 'local')
+        self.local_cache_path = os.path.join(mlc_local_repo_path, "cache")
+        if not os.path.exists(self.local_cache_path):
+            os.makedirs(self.local_cache_path, exist_ok=True)
         self.repos = self.load_repos_and_meta()
         #logger.info(f"In Action class: {self.repos_path}")
         self.index = Index(self.repos_path, self.repos)
+
 
         #self.repos = {
         #'lst': repo_paths
@@ -242,14 +247,15 @@ class Action:
             return res
 
         # Determine paths and metadata format
-        repo_path = res["path"]
+        repo_path = res["list"][0].path
         repo_meta = {
                 'alias': item_repo[0],
                 'uid' : item_repo[1],
                 }
-        target_path = os.path.join(repo_path, self.action_type)
-        if self.action_type == "cache1":
-            folder_name = f"""{i["script_alias"]}_{item_name or item_id}""" if i.get("script_alias") else item_name or item_id
+        target_name = i.get('target_name', self.action_type)
+        target_path = os.path.join(repo_path, target_name)
+        if target_name == "cache":
+            folder_name = f"""{i["script_alias"]}_{item_name or item_id[:8]}""" if i.get("script_alias") else item_name or item_id
         else:
             folder_name = item_name or item_id
 
@@ -282,7 +288,7 @@ class Action:
         if save_result["return"] > 0:
             return save_result
     
-        self.index.add(item_meta, self.action_type, item_path, repo_meta, repo_path)
+        self.index.add(item_meta, target_name, item_path, repo_meta, repo_path)
 
         return {
             "return": 0,
@@ -305,7 +311,10 @@ class Action:
             dict: Return code and message.
         """
         # Step 1: Search for items based on input tags
+        target_name = i.get('target_name',"cache")
+        i['target_name'] = target_name
         ii = i.copy()
+
         if i.get('search_tags'):
             ii['tags'] = ",".join(i['search_tags'])
         search_result = self.search(ii)
@@ -358,6 +367,9 @@ class Action:
             #print(f"item.meta = {item.meta}, saved_meta = {saved_meta}")
             save_result = utils.save_json(item_meta_path, meta=meta)
             #print(f"item_meta = {item.meta}, path = {item.path}")
+            #print(item.repo_path)
+            #return {'return': 1}
+            self.index.update(meta, target_name, item.path, item.repo_meta, item.repo_path)
 
         return {'return': 0, 'message': f"Tags updated successfully for {len(found_items)} item(s).", 'list': found_items }
 
@@ -365,7 +377,8 @@ class Action:
 
     def search(self, i):
         indices = self.index.indices
-        target_index = indices.get(self.action_type)
+        target = i.get('target_name', self.action_type)
+        target_index = indices.get(target)
         result = []
         uid = i.get("uid")
         if target_index:
@@ -377,8 +390,9 @@ class Action:
             else:
                 tags= i.get("tags")
                 tags_split = tags.split(",")
-                n_tags = [p for p in tags_split if p.startswith("-")]
-                p_tags = list(set(tags_split) - set(n_tags))
+                n_tags_ = [p for p in tags_split if p.startswith("-")]
+                n_tags = [p[1:] for p in n_tags_]
+                p_tags = list(set(tags_split) - set(n_tags_))
                 for res in target_index:
                     c_tags = res["tags"]
                     if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
@@ -419,6 +433,29 @@ class Index:
                     "path": path,
                     "repo": {"uid": repo_meta['uid'], "alias": repo_meta['alias'], "path": repo_path}
                 })
+
+    def get_index(self, folder_type, uid):
+        for index in range(len(self.indices[folder_type])):
+            if self.indices[folder_type][index]["uid"] == uid:
+                return index
+        return -1
+
+    def update(self, meta, folder_type, path, repo_meta, repo_path):
+        uid = meta['uid']
+        alias = meta['alias']
+        tags = meta['tags']
+        index = self.get_index(folder_type, uid)
+        if index == -1: #add it
+            self.add(meta, folder_type, path, repo_meta, repo_path)
+            logger.debug(f"Index update failed, new index created for {uid}")
+        else:
+            self.indices[folder_type][index] = {
+                    "uid": uid,
+                    "tags": tags,
+                    "alias": alias,
+                    "path": path,
+                    "repo": {"uid": repo_meta['uid'], "alias": repo_meta['alias'], "path": repo_path}
+                }
 
     def build_index(self):
         """
@@ -642,13 +679,24 @@ class Automation:
 class RepoAction(Action):
 
     def find(self, args):
-        repo = args.get('item')
-        repo_uid = repo.split(",")[1]
+        if isinstance(args, dict):
+            repo = args.get('item', args.get('artifact'))
+        else:
+            repo = args.details
+        repo_split = repo.split(",")
+        if len(repo_split) > 1:
+            repo_uid = repo_split[1]
+        repo_name = repo_split[0]
+
+        lst = []
         #print(f"args = {args}")
         for i in self.repos:
-            if i.meta['uid'] == repo_uid:
-                return {'return': 0, 'path': i.path}
-        return {'return': 1, 'error': f'No repo found for uid {repo_uid}'}
+            if repo_uid and i.meta['uid'] == repo_uid:
+                lst.append(i)
+            elif repo_name == i.meta['alias']:
+                lst.append(i)
+                
+        return {'return': 0, 'list': lst}
 
     def github_url_to_user_repo_format(self, url):
         """
@@ -723,6 +771,14 @@ class RepoAction(Action):
             
     def list(self, args):
         logger.info("Listing all repositories.")
+        print("\nRepositories:")
+        print("-------------")
+        for repo_object in self.repos:
+            print(f"- Alias: {repo_object.meta.get('alias', 'Unknown')}")
+            print(f"  Path:  {repo_object.path}\n")
+        print("-------------")
+        logger.info("Repository listing ended")
+        
 
 class ScriptAction(Action):
 
@@ -752,8 +808,32 @@ class ScriptAction(Action):
     def update_script_run_args(self, run_args, inp):
         for key in inp:
             if "=" in key:
-                split = key.split("=")
-                run_args[split[0].strip("-")] = split[1]
+                split = key.split("=", 1)  # Split only on the first "="
+                arg_key = split[0].strip("-")
+                arg_value = split[1]
+
+                # Handle lists: Only if "," is immediately before the "="
+                if "," in arg_key:
+                    list_key, list_values = arg_key.rsplit(",", 1)
+                    if not list_values:  # Ensure "=" follows the last comma
+                        run_args[list_key] = arg_value.split(",")
+                        continue
+
+                # Handle dictionaries: `--adr.compiler.tags=gcc` becomes `{"adr": {"compiler": {"tags": "gcc"}}}`
+                elif "." in arg_key:
+                    keys = arg_key.split(".")
+                    current = run_args
+                    for part in keys[:-1]:
+                        if part not in current or not isinstance(current[part], dict):
+                            current[part] = {}
+                        current = current[part]
+                    current[keys[-1]] = arg_value
+            
+                # Handle simple key-value pairs
+                else:
+                    run_args[arg_key] = arg_value
+        
+            # Handle flags: `--flag` becomes `{"flag": True}`
             elif key.startswith("-"):
                 run_args[key.strip("-")] = True
 
@@ -788,8 +868,9 @@ class ScriptAction(Action):
         # Check if ScriptAutomation is defined in the module
         if hasattr(module, 'ScriptAutomation'):
             automation_instance = module.ScriptAutomation(self, module_path)
-            logger.info(f" script automation initialized at {module_path}")
+            #logger.info(f" script automation initialized at {module_path}")
             #logger.info(run_args)
+            #return {'return': 1}
             result = automation_instance.run(run_args)  # Pass args to the run method
             #logger.info(result)
             if result['return'] > 0:
@@ -857,7 +938,8 @@ class CfgAction(Action):
             args (dict): Contains the configuration details such as file path, etc.
         """
         #logger.info("In cfg load")
-        config_file = args.get('config_file', 'config.yaml')
+        default_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'config.yaml')
+        config_file = args.get('config_file', default_config_path)
         logger.info(f"In cfg load, config file = {config_file}")
         if not config_file or not os.path.exists(config_file):
             logger.info(f"Error: Configuration file '{config_file}' not found.")
@@ -905,6 +987,14 @@ def get_action(target):
     action_class = actions.get(target, None)
     return action_class() if action_class else None
 
+
+def access(i):
+    action = i['action']
+    automation = i['automation']
+    action_class = get_action(automation)
+    r = action_class.access(i)
+    return r
+
 # Main CLI function
 def main():
     parser = argparse.ArgumentParser(prog='mlc', description='A CLI tool for managing repos, scripts, and caches.')
@@ -931,11 +1021,8 @@ def main():
 
     for action in ['load']:
         load_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
-        load_parser.add_argument('target', choices=['utils', 'cfg'], help='Target type (utils, cfg).')
+        load_parser.add_argument('target', choices=['cfg'], help='Target type (cfg).')
     
-    for action in [ 'get_host_os_info']:
-        utils_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
-        utils_parser.add_argument('target', choices=['utils'], help='Target type (utils).')
     
     # Parse arguments
     args = parser.parse_args()
@@ -973,9 +1060,7 @@ def main():
                 logger.info(f"Error: '{args.target_or_url}' is not a valid target for pull.")
     else:
         # Get the action handler for other commands
-        logger.info(f"Going for action = {args.target}")
         action = get_action(args.target)
-        logger.info(f"Got action = {action}")
         # Dynamically call the method (e.g., run, list, show)
         if action and hasattr(action, args.command):
             method = getattr(action, args.command)
