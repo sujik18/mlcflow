@@ -86,8 +86,7 @@ class Action:
 
     def load_repos_and_meta(self):
         repos_list = []
-        repos_file_dir = os.path.dirname(self.repos_path)
-        repos_file_path = os.path.join(repos_file_dir, 'repos.json')
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
 
         # Read the JSON file line by line
         try:
@@ -135,8 +134,7 @@ class Action:
     def load_repos(self):
         # todo: what if the repo is already found in the repos folder but not registered and we pull the same repo
         # Get the path to the repos.json file in $HOME/MLC
-        repos_file_dir = os.path.dirname(self.repos_path)
-        repos_file_path = os.path.join(repos_file_dir, 'repos.json')
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
 
         # Check if the file exists
         if not os.path.exists(repos_file_path):
@@ -165,8 +163,7 @@ class Action:
     
     def register_repo(self, repo_meta):
         # Get the path to the repos.json file in $HOME/MLC
-        repos_file_dir = os.path.dirname(self.repos_path)
-        repos_file_path = os.path.join(repos_file_dir, 'repos.json')
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
 
         with open(repos_file_path, 'r') as f:
             repos_list = json.load(f)
