@@ -22,6 +22,7 @@ class Action:
     cfg = None
     action_type = None
     logger = None
+    local_repo = None
     #mlc = None
     repos = []
     def execute(self, args):
@@ -125,6 +126,8 @@ class Action:
                 logger.info(f"Error loading YAML in {meta_yaml_path}: {e}")
                 continue
 
+            if meta['alias'] == "local":
+                self.local_repo = (meta['alias'], meta['uid'])
             # Create a Repo object and add it to the list
             repos_list.append(Repo(path=repo_path, meta=meta))
 
@@ -181,6 +184,7 @@ class Action:
     def __init__(self):        
         self.logger = logging.getLogger()
         self.repos_path = os.environ.get('MLC_REPOS', os.path.expanduser('~/MLC/repos'))
+        '''
         res = self.access({'action': 'load',
                             'automation': 'cfg,88dce9c160324c5d',
                             'item': 'default'})
@@ -190,7 +194,8 @@ class Action:
         if self.cfg:
             mlc_local_repo_path = os.path.join(self.repos_path, self.cfg.get('MLC_LOCAL_REPO_FOLDER', 'local'))
         else:
-            mlc_local_repo_path = os.path.join(self.repos_path, 'local')
+        '''
+        mlc_local_repo_path = os.path.join(self.repos_path, 'local')
         
         mlc_local_repo_path_expanded = Path(mlc_local_repo_path).expanduser().resolve()
 
@@ -240,10 +245,7 @@ class Action:
         # Determine repository
         item_repo = i.get("item_repo")
         if not item_repo:
-            item_repo = (
-                self.cfg["local_repo_meta"]["alias"],
-                self.cfg["local_repo_meta"]["uid"],
-            )
+            item_repo = self.local_repo
 
         # Parse item details
         item = i.get("item")
