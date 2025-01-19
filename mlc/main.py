@@ -155,6 +155,7 @@ class Action:
     def __init__(self):        
         self.logger = logging.getLogger()
         self.repos_path = os.environ.get('MLC_REPOS', os.path.expanduser('~/MLC/repos'))
+        '''
         res = self.access({'action': 'load',
                             'automation': 'cfg,88dce9c160324c5d',
                             'item': 'default'})
@@ -163,7 +164,8 @@ class Action:
         if self.cfg:
             mlc_local_repo_path = os.path.join(self.repos_path, self.cfg.get('MLC_LOCAL_REPO_FOLDER', 'local'))
         else:
-            mlc_local_repo_path = os.path.join(self.repos_path, 'local')
+        '''
+        mlc_local_repo_path = os.path.join(self.repos_path, 'local')
         self.local_cache_path = os.path.join(mlc_local_repo_path, "cache")
         if not os.path.exists(self.local_cache_path):
             os.makedirs(self.local_cache_path, exist_ok=True)
