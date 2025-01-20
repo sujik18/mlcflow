@@ -88,8 +88,8 @@ def load_txt(file_name, check_if_exists=False, split=False, match_text=None, fai
         
         result = {'return': 0}
         if split:
-            result['string'] = content.splitlines()
-            result['list'] = result['string']
+            result['list'] = content.splitlines()
+            result['string'] = content
         else:
             result['string'] = content
         
@@ -177,40 +177,7 @@ def run_system_cmd(i):
     except Exception as e:
         return {'return': 1, 'error': f"Unexpected error occurred: {str(e)}"}
 
-'''
-def load_txt(file_name, remove_after_read=False, check_if_exists=True):
-    """
-    Loads the content of a text file into a string, with the option to delete the file after reading.
 
-    Args:
-        file_name (str): The path to the text file to read.
-        remove_after_read (bool): If True, the file will be removed after reading.
-
-    Returns:
-        dict: A dictionary containing:
-            - return (int): Return code, 0 if no error, >0 if error
-            - error (str): Error string if return > 0
-            - string (str): The content of the file, or an empty string if there is an error.
-    """
-    try:
-        # Check if the file exists
-        if not os.path.isfile(file_name):
-            return {'return': 1, 'error': f"File {file_name} not found", 'string': ''}
-
-        # Read the content of the file
-        with open(file_name, 'r') as file:
-            file_content = file.read()
-
-        # Optionally remove the file after reading
-        if remove_after_read:
-            os.remove(file_name)
-
-        # Return the content in the expected dictionary format
-        return {'return': 0, 'error': '', 'string': file_content}
-
-    except Exception as e:
-        return {'return': 1, 'error': str(e), 'string': ''}
-'''
 def print_env(env):
     print_formatted_json(env)
 
