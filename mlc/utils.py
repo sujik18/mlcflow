@@ -567,5 +567,4 @@ def extract_file(options):
         raise ValueError(f"Unsupported file format: {filename}")
 
     print(f"Extraction complete. Files extracted to: {extract_to}")
-    return {'return': 0}
 
