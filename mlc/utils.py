@@ -6,10 +6,10 @@ import importlib.util
 import platform
 import json
 import yaml
-
-import os
 import uuid
 import shutil
+import tarfile
+import zipfile
 
 def generate_temp_file(i):
     """
@@ -88,8 +88,8 @@ def load_txt(file_name, check_if_exists=False, split=False, match_text=None, fai
         
         result = {'return': 0}
         if split:
-            result['string'] = content.splitlines()
-            result['list'] = result['string']
+            result['list'] = content.splitlines()
+            result['string'] = content
         else:
             result['string'] = content
         
@@ -177,40 +177,7 @@ def run_system_cmd(i):
     except Exception as e:
         return {'return': 1, 'error': f"Unexpected error occurred: {str(e)}"}
 
-'''
-def load_txt(file_name, remove_after_read=False, check_if_exists=True):
-    """
-    Loads the content of a text file into a string, with the option to delete the file after reading.
 
-    Args:
-        file_name (str): The path to the text file to read.
-        remove_after_read (bool): If True, the file will be removed after reading.
-
-    Returns:
-        dict: A dictionary containing:
-            - return (int): Return code, 0 if no error, >0 if error
-            - error (str): Error string if return > 0
-            - string (str): The content of the file, or an empty string if there is an error.
-    """
-    try:
-        # Check if the file exists
-        if not os.path.isfile(file_name):
-            return {'return': 1, 'error': f"File {file_name} not found", 'string': ''}
-
-        # Read the content of the file
-        with open(file_name, 'r') as file:
-            file_content = file.read()
-
-        # Optionally remove the file after reading
-        if remove_after_read:
-            os.remove(file_name)
-
-        # Return the content in the expected dictionary format
-        return {'return': 0, 'error': '', 'string': file_content}
-
-    except Exception as e:
-        return {'return': 1, 'error': str(e), 'string': ''}
-'''
 def print_env(env):
     print_formatted_json(env)
 
@@ -546,3 +513,58 @@ def convert_tags_to_list(tags_string):
     tags_list = [tag.strip() for tag in tags_string.split(',') if tag.strip()]
 
     return {'return': 0, 'tags': tags_list}
+
+
+
+def extract_file(options):
+    """
+    Extracts a compressed file, optionally stripping folder levels.
+
+    Args:
+        options (dict): A dictionary with the following keys:
+            - 'filename' (str): The path to the compressed file to extract.
+            - 'strip_folders' (int, optional): The number of folder levels to strip. Default is 0.
+
+    Raises:
+        ValueError: If the file format is unsupported.
+        FileNotFoundError: If the specified file does not exist.
+    """
+    filename = options.get('filename')
+    strip_folders = options.get('strip_folders', 0)
+
+    if not filename or not os.path.exists(filename):
+        raise FileNotFoundError(f"File not found: {filename}")
+
+    extract_to = os.path.join(os.path.dirname(filename), "extracted")
+    os.makedirs(extract_to, exist_ok=True)
+
+    # Check file type and extract accordingly
+    if zipfile.is_zipfile(filename):
+        with zipfile.ZipFile(filename, 'r') as archive:
+            members = archive.namelist()
+            for member in members:
+                # Strip folder levels
+                stripped_path = os.path.join(
+                    extract_to, *member.split(os.sep)[strip_folders:]
+                )
+                if member.endswith('/'):  # Directory
+                    os.makedirs(stripped_path, exist_ok=True)
+                else:  # File
+                    os.makedirs(os.path.dirname(stripped_path), exist_ok=True)
+                    with archive.open(member) as source, open(stripped_path, 'wb') as target:
+                        shutil.copyfileobj(source, target)
+
+    elif tarfile.is_tarfile(filename):
+        with tarfile.open(filename, 'r') as archive:
+            members = archive.getmembers()
+            for member in members:
+                if strip_folders:
+                    parts = member.name.split('/')
+                    member.name = '/'.join(parts[strip_folders:])
+                archive.extract(member, path=extract_to)
+
+    else:
+        raise ValueError(f"Unsupported file format: {filename}")
+
+    print(f"Extraction complete. Files extracted to: {extract_to}")
+

@@ -11,6 +11,7 @@ import logging
 from types import SimpleNamespace
 import mlc.utils as utils
 from pathlib import Path
+import shutil
 
 # Set up logging configuration
 def setup_logging(log_path = '.\mlc',log_file = 'mlc-log.txt'):
@@ -40,8 +41,10 @@ class Action:
     cfg = None
     action_type = None
     logger = None
+    local_repo = None
+    current_repo_path = None
     #mlc = None
-    repos = []
+    repos = [] #list of Repo objects
     def execute(self, args):
         raise NotImplementedError("Subclasses must implement the execute method")
 
@@ -60,12 +63,14 @@ class Action:
             return {'return': 1, 'error': "'action' key is required in options"}
         #logger.info(f"options = {options}")
 
+        #print(f"options = {options}")
         action_target = options.get('target')
         if not action_target:
             action_target = options.get('automation', 'script')  # Default to script if not provided
         action_target_split = action_target.split(",")
         action_target = action_target_split[0]
 
+        #print(f"action_target = {action_target}")
         action = actions.get(action_target)
         #logger.info(f"action = {action}")
 
@@ -73,6 +78,7 @@ class Action:
             if hasattr(action, action_name):
                 # Find the method and call it with the options
                 method = getattr(action, action_name)
+                #print(f"method = {method}, action = {action}, action_name  = {action_name}")
                 result = method(self, options)
                 #logger.info(f"result ={result}")
                 return result
@@ -120,8 +126,19 @@ class Action:
         except Exception as e:
             logger.info(f"Error reading file: {e}")
             return []
+        
+        def is_curdir_inside_path(base_path):
+            # Convert to absolute paths
+            base_path = Path(base_path).resolve()
+            curdir = Path.cwd().resolve()
+
+            # Check if curdir is inside base_path
+            return curdir in base_path.parents or curdir == base_path
+
         # Iterate through the list of repository paths
         for repo_path in repo_paths:
+            if is_curdir_inside_path(repo_path):
+                self.current_repo_path = repo_path
             repo_path = repo_path.strip()  # Remove any extra whitespace or newlines
 
            # Skip empty lines
@@ -143,6 +160,8 @@ class Action:
                 logger.info(f"Error loading YAML in {meta_yaml_path}: {e}")
                 continue
 
+            if meta['alias'] == "local":
+                self.local_repo = (meta['alias'], meta['uid'])
             # Create a Repo object and add it to the list
             repos_list.append(Repo(path=repo_path, meta=meta))
 
@@ -176,7 +195,11 @@ class Action:
             if repo_object.meta.get('uid', '') == '':
                 return {"return": 1, "error": f"UID is not present in file 'meta.yaml' in the repo path {repo_object.path}"}
             if repo_meta["uid"] == repo_object.meta.get('uid', ''):
-                return {"return": 1, "error": f"Can not register repo as it's conflicting with repo in the path {repo_object.path}"}
+                #print(f"{repo_meta['path']} {repo_object.path}")
+                if repo_meta['path'] == repo_object.path:
+                    return {"return": 1, "error": f"Same repo is already registered"}
+                else:
+                    return {"return": 1, "error": f"Conflicting with repo in the path {repo_object.path}", "conflicting_path": repo_object.path}
         return {"return": 0}
     
     def register_repo(self, repo_meta):
@@ -195,10 +218,26 @@ class Action:
             json.dump(repos_list, f, indent=2)
             logger.info(f"Updated repos.json at {repos_file_path}")
 
+    def unregister_repo(self, repo_path):
+        logger.info(f"Unregistering the repo in path {repo_path}")
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
+
+        with open(repos_file_path, 'r') as f:
+            repos_list = json.load(f)
+        
+        if repo_path in repos_list:
+            repos_list.remove(repo_path)
+            with open(repos_file_path, 'w') as f:
+                json.dump(repos_list, f, indent=2)  
+            logger.info(f"Path: {repo_path} has been removed.")
+        else:
+            logger.info(f"Path: {repo_path} not found in {repos_file_path}. Nothing to be unregistered!")
+
 
     def __init__(self):        
         self.logger = logging.getLogger()
         self.repos_path = os.environ.get('MLC_REPOS', os.path.expanduser('~/MLC/repos'))
+        '''
         res = self.access({'action': 'load',
                             'automation': 'cfg,88dce9c160324c5d',
                             'item': 'default'})
@@ -208,7 +247,8 @@ class Action:
         if self.cfg:
             mlc_local_repo_path = os.path.join(self.repos_path, self.cfg.get('MLC_LOCAL_REPO_FOLDER', 'local'))
         else:
-            mlc_local_repo_path = os.path.join(self.repos_path, 'local')
+        '''
+        mlc_local_repo_path = os.path.join(self.repos_path, 'local')
         
         mlc_local_repo_path_expanded = Path(mlc_local_repo_path).expanduser().resolve()
 
@@ -258,10 +298,7 @@ class Action:
         # Determine repository
         item_repo = i.get("item_repo")
         if not item_repo:
-            item_repo = (
-                self.cfg["local_repo_meta"]["alias"],
-                self.cfg["local_repo_meta"]["uid"],
-            )
+            item_repo = self.local_repo
 
         # Parse item details
         item = i.get("item")
@@ -293,11 +330,9 @@ class Action:
             return res
 
         # Determine paths and metadata format
-        repo_path = res["list"][0].path
-        repo_meta = {
-                'alias': item_repo[0],
-                'uid' : item_repo[1],
-                }
+        repo = res["list"][0]
+        repo_path = repo.path
+
         target_name = i.get('target_name', self.action_type)
         target_path = os.path.join(repo_path, target_name)
         if target_name == "cache":
@@ -306,13 +341,23 @@ class Action:
             folder_name = item_name or item_id
 
         item_path = os.path.join(target_path, folder_name)
-        meta_format = "yaml" if i.get("yaml") else "json"
-        item_meta_path = os.path.join(item_path, f"_cm.{meta_format}")
 
         # Create item directory if it does not exist
         if not os.path.exists(item_path):
             os.makedirs(item_path)
 
+        res = self.save_new_meta(i, item_id, item_name, target_name, item_path, repo)
+        if res['return'] > 0:
+            return res
+
+        return {
+            "return": 0,
+            "message": f"Item successfully added at {item_path}",
+            "path": item_path,
+            "repo": repo
+        }
+
+    def save_new_meta(self, i, item_id, item_name, target_name, item_path, repo):
         # Prepare metadata
         item_meta = i.get('meta')
         item_meta.update({
@@ -326,6 +371,8 @@ class Action:
         item_meta["tags"] = list(set(tags + new_tags))  # Ensure unique tags
 
         # Save metadata
+        meta_format = "yaml" if i.get("yaml") else "json"
+        item_meta_path = os.path.join(item_path, f"_cm.{meta_format}")
         if meta_format == "yaml":
             save_result = utils.save_yaml(item_meta_path, meta=item_meta)
         else:
@@ -334,15 +381,8 @@ class Action:
         if save_result["return"] > 0:
             return save_result
     
-        self.index.add(item_meta, target_name, item_path, repo_meta, repo_path)
-
-        return {
-            "return": 0,
-            "message": f"Item successfully added at {item_path}",
-            "path": item_path,
-            "meta": item_meta,
-            "repo": {"uid": repo_meta['uid'], "alias": repo_meta['alias'], "path": repo_path}
-        }
+        self.index.add(item_meta, target_name, item_path, repo)
+        return {'return': 0}
 
     def update(self, i):
         """
@@ -415,24 +455,121 @@ class Action:
             #print(f"item_meta = {item.meta}, path = {item.path}")
             #print(item.repo_path)
             #return {'return': 1}
-            self.index.update(meta, target_name, item.path, item.repo_meta, item.repo_path)
+            self.index.update(meta, target_name, item.path, item.repo)
 
         return {'return': 0, 'message': f"Tags updated successfully for {len(found_items)} item(s).", 'list': found_items }
 
+    def is_uid(self, name):
+        """
+        Checks if the given name is a 16-digit hexadecimal UID.
 
+        Args:
+            name (str): The string to check.
+
+        Returns:
+            bool: True if the name is a 16-digit hexadecimal UID, False otherwise.
+        """
+        # Define a regex pattern for a 16-digit hexadecimal UID
+        hex_uid_pattern = r"^[0-9a-fA-F]{16}$"
+
+        # Check if the name matches the pattern
+        return bool(re.fullmatch(hex_uid_pattern, name))
+
+    def cp(self, args):
+        #print(f"args = {args}")
+        action_target = args.target
+        src_item = args.details
+        target_item = args.extra[0]
+        src_split = src_item.split(":")
+        target_split = target_item.split(":")
+        if len(src_split) > 1:
+            src_repo = src_split[0]
+            src_item = src_split[1]
+        else:
+            src_item = src_split[0]
+
+        inp = {}
+        inp['alias'] = src_item
+        inp['folder_name'] = src_item #we dont know if the user gave the alias or the folder name, we first check for alias and then the folder name
+        if self.is_uid(src_item):
+            inp['uid'] = src_item
+
+        inp['target_name'] = action_target
+        res = self.search(inp)
+
+        if len(res['list']) == 0:
+            return {'return': 1, 'error': f'No {action_target} found for {src_item}'}
+        elif len(res['list']) > 1:
+            return {'return': 1, 'error': f'More than 1 {action_target} found for {src_item}: {res["list"]}'}
+        else:
+            result = res['list'][0]
+            src_item_path = result.path
+            src_repo_path = result.repo_path
+            src_item_meta = result.meta
+
+
+        if len(target_split) > 1:
+            target_repo = target_split[0]
+            target_repo_path = os.path.join(self.repo_path, target_repo)
+            #target_repo_meta.path
+            target_item_name = target_split[1]
+        else:
+            target_repo_path = src_repo_path  #use the src repo itself
+            target_repo_meta = result.repo_meta
+            target_item_name = target_split[0]
+
+        target_item_path = os.path.join(target_repo_path, action_target, target_item)
+        print(f"src_path = {src_item_path}, target_item = {target_item_name}, target_item_path = {target_item_path}, target_meta = {target_repo_meta}")
+        target_repo = Repo(target_repo_path, target_repo_meta)
+        target_item = Item(target_item_path, target_repo)
+        return 1
+        self.copy_item_with_meta(src_path, target_item_path, src_item_meta)
+
+        ii = {}
+        res = self.save_new_meta(ii, item_id, target_item, action_target, target_item_path, repo_meta, target_repo_path)
+        if res['return'] > 0:
+            return res
+
+
+    def copy_item_with_meta(self, source_path, destination_path):
+        try:
+            # Copy the source folder to the destination
+            shutil.copytree(source_path, destination_path)
+            print(f"Folder successfully copied from {source_path} to {destination_path}")
+        except FileExistsError:
+            return {'return': 1, 'error': f"Destination folder {destination_path} already exists."}
+        except FileNotFoundError:
+            return {'return': 1, 'error': f"Source folder {source_path} not found"}
+        except Exception as e:
+            return {'return': 1, 'error': f"An error occurred {e}"}
+
+        #fix the uid in the meta
 
     def search(self, i):
         indices = self.index.indices
+        #print(f"search input = {i}")
+        #print(f"Cache search i = {i}")
+        #return {'return': 1}
         target = i.get('target_name', self.action_type)
+        #logger.debug(f"Search target = {target}")
         target_index = indices.get(target)
         result = []
         uid = i.get("uid")
+        alias = i.get("alias")
+        folder_name = i.get("folder_name")
+        found = False
         if target_index:
-            if uid:
+            if uid or alias:
                 for res in target_index:
-                    if res["uid"] == uid:
+                    if res["uid"] == uid or (alias and res["alias"] == alias):
                         it = Item(res['path'], res['repo'])
                         result.append(it)
+                        found = True
+                if not found and folder_name:
+                    for res in target_index:
+                        if os.path.basename(res["path"]) == folder_name:
+                            it = Item(res['path'], res['repo'])
+                            #result.append(it)
             else:
                 tags= i.get("tags")
                 tags_split = tags.split(",")
@@ -444,6 +581,7 @@ class Action:
                     if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
                         it = Item(res['path'], res['repo'])
                         result.append(it)
+        #print(f"Search result for target {target} = {result}")
         return {'return': 0, 'list': result}
 
 
@@ -468,7 +606,7 @@ class Index:
         self.indices = {key: [] for key in self.index_files.keys()}
         self.build_index()
 
-    def add(self, meta, folder_type, path, repo_meta, repo_path):
+    def add(self, meta, folder_type, path, repo):
         unique_id = meta['uid']
         alias = meta['alias']
         tags = meta['tags']
@@ -477,7 +615,7 @@ class Index:
                     "tags": tags,
                     "alias": alias,
                     "path": path,
-                    "repo": {"uid": repo_meta['uid'], "alias": repo_meta['alias'], "path": repo_path}
+                    "repo": repo
                 })
 
     def get_index(self, folder_type, uid):
@@ -486,13 +624,13 @@ class Index:
                 return index
         return -1
 
-    def update(self, meta, folder_type, path, repo_meta, repo_path):
+    def update(self, meta, folder_type, path, repo):
         uid = meta['uid']
         alias = meta['alias']
         tags = meta['tags']
         index = self.get_index(folder_type, uid)
         if index == -1: #add it
-            self.add(meta, folder_type, path, repo_meta, repo_path)
+            self.add(meta, folder_type, path, repo)
             logger.debug(f"Index update failed, new index created for {uid}")
         else:
             self.indices[folder_type][index] = {
@@ -500,7 +638,7 @@ class Index:
                     "tags": tags,
                     "alias": alias,
                     "path": path,
-                    "repo": {"uid": repo_meta['uid'], "alias": repo_meta['alias'], "path": repo_path}
+                    "repo": repo
                 }
 
     def build_index(self):
@@ -534,11 +672,11 @@ class Index:
                     for config_file in ["_cm.yaml", "_cm.json"]:
                         config_path = os.path.join(automation_path, config_file)
                         if os.path.isfile(config_path):
-                            self._process_config_file(config_path, folder_type, automation_path, repo.path, repo.meta)
+                            self._process_config_file(config_path, folder_type, automation_path, repo)
                             break  # Only process one config file per automation_dir
         self._save_indices()
 
-    def _process_config_file(self, config_file, folder_type, folder_path, repo_path, repo_meta):
+    def _process_config_file(self, config_file, folder_type, folder_path, repo):
         """
         Process a single configuration file (_cm.json or _cm.yaml) and add its data to the corresponding index.
 
@@ -574,47 +712,13 @@ class Index:
                     "tags": tags,
                     "alias": alias,
                     "path": folder_path,
-                    "repo": {"uid": repo_meta['uid'], "alias": repo_meta['alias'], "path": repo_path}
+                    "repo": repo
                 })
             else:
                 logger.info(f"Skipping {config_file}: Missing 'uid' field.")
         except Exception as e:
             logger.info(f"Error processing {config_file}: {e}")
 
-    '''
-    def _process_yaml_file(self, yaml_file, folder_type, folder_path):
-        """
-        Process a single _cm.yaml file and add its data to the corresponding index.
-        
-        Args:
-            yaml_file (str): Path to the YAML file.
-            folder_type (str): Type of folder (script, cache, or experiment).
-            folder_path (str): Path to the folder containing the YAML file.
-        
-        Returns:
-            None
-        """
-        try:
-            #logger.info(f"yaml file = {yaml_file}")
-            with open(yaml_file, "r") as f:
-                data = yaml.safe_load(f)
-
-            unique_id = data.get("uid")
-            tags = data.get("tags", [])
-            alias = data.get("alias", None)
-
-            if unique_id:
-                self.indices[folder_type].append({
-                    "uid": unique_id,
-                    "tags": tags,
-                    "alias": alias,
-                    "path": folder_path
-                })
-            else:
-                logger.info(f"Skipping {yaml_file}: Missing 'id' field.")
-        except Exception as e:
-            logger.info(f"Error processing {yaml_file}: {e}")
-    '''
 
     def _save_indices(self):
         """
@@ -638,22 +742,9 @@ class Item:
     def __init__(self, path, repo):
         self.meta = None
         self.path = path
-        self.repo_meta = None
-        self.repo_path = repo['path']
-        self._load_repo_meta()
+        self.repo = repo
         self._load_meta()
 
-    def _load_repo_meta(self):
-        yaml_file = os.path.join(self.repo_path, "meta.yaml")
-
-        json_file = os.path.join(self.repo_path, "meta.json")
-
-        if os.path.exists(yaml_file):
-            self.repo_meta = utils.read_yaml(yaml_file)
-        elif os.path.exists(json_file):
-            self.repo_meta = utils.read_json(json_file)
-        else:
-            logger.info(f"No meta file found in {self.repo_path}")
 
     def _load_meta(self):
         yaml_file = os.path.join(self.path, "_cm.yaml")
@@ -670,7 +761,23 @@ class Item:
 class Repo:
     def __init__(self, path, meta):
         self.path = path
-        self.meta = meta
+        if meta:
+            self.meta = meta
+        else:
+            self._load_meta()
+        
+    
+    def _load_meta(self):
+        yaml_file = os.path.join(self.path, "meta.yaml")
+
+        json_file = os.path.join(self.path, "meta.json")
+
+        if os.path.exists(yaml_file):
+            self.repo_meta = utils.read_yaml(yaml_file)
+        elif os.path.exists(json_file):
+            self.repo_meta = utils.read_json(json_file)
+        else:
+            logger.info(f"No meta file found in {self.path}")
 
 class Automation:
     action_object = None
@@ -763,17 +870,7 @@ class RepoAction(Action):
         else:
             raise ValueError("Invalid GitHub URL format")
 
-    def pull(self, args):
-        repo_url = args.details if args.details else args.target_or_url
-        branch = None
-        checkout = None
-        extras = args.extra
-        for item in extras:
-            split = item.split("=")
-            if split[0] == "--branch":
-                branch = split[1]
-            elif split[0] == "--checkout":
-                checkout = split[1]
+    def pull_repo(self, repo_url, branch=None, checkout = None):
         
         # Determine the checkout path from environment or default
         repo_base_path = self.repos_path # either the value will be from 'MLC_REPOS'
@@ -801,68 +898,6 @@ class RepoAction(Action):
                 
                 subprocess.run(clone_command, check=True)
 
-                meta_file_path = os.path.join(repo_path, 'meta.yaml')
-                if not os.path.exists(meta_file_path):
-                    logger.warning(f"meta.yaml not found in {repo_path}. Repo pulled but not register in mlc repos. Skipping...")
-                    return
-                
-                with open(meta_file_path, 'r') as meta_file:
-                    meta_data = yaml.safe_load(meta_file)
-                    meta_data["path"] = repo_path
-
-                # Check UID conflicts
-                is_conflict = self.conflicting_repo(meta_data)
-                if is_conflict['return'] > 0:
-                    if "UID not present" in is_conflict['error']:
-                        logger.warning(f"UID not found in meta.yaml at {repo_path}. Repo pulled but can not register in mlc repos. Skipping...")
-                        return
-                    else:
-                        logger.warning(f"{is_conflict['error']} Repo pulled but can not register in mlc repos. Skipping...")
-                        return
-                    
-                self.register_repo(meta_data)
-
-
-                #recursive cloning of the dependency repo still to be done
-
-                # dependencies = cmr_data.get('deps', [])
-                # for dep in dependencies:
-                #     dep_alias = dep.get('alias')
-                #     dep_uid = dep.get('uid')
-                #     if not dep_alias or not dep_uid:
-                #         logger.warning(f"Skipped a invalid dependency from {repo_name}")  # Skip invalid dependencies
-                #         continue
-
-                #     is_conflict = self.conflicting_repo({"uid": dep_uid})
-
-                #     # Check if the  dependency repo is already present. If yes then no need to clone again.
-                #     if is_conflict['return'] > 0:
-                #         if "conflicting" in is_conflict["error"]:
-                #             logger.warning(f"The {dep_alias} repo is not cloned as it is already registered in mlc repo")
-                #             continue
-                    
-                #     dep_args = args
-                #     dep_args.details = dep_alias
-
-                #     # call the function recursively
-                #     res = self.access({'action': 'pull',
-                #                 'automation': 'repo',
-                #                 'target_or_url': dep_alias,
-                #                 'details': dep_alias,
-                #                 'extra': args.extra})
-                #     if res['return'] > 0:
-                #         return res
-                    # self.pull(dep_args)
-
-
-
-                    
-
-                # res = self.access({'action': 'pull',
-                #             'automation': 'repo',
-                #             'item': 'default'})
-                # if res['return'] > 0:
-                #     return res
             else:
                 logger.info(f"Repository {repo_name} already exists at {repo_path}. Pulling latest changes...")
                 subprocess.run(['git', '-C', repo_path, 'pull'], check=True)
@@ -873,10 +908,59 @@ class RepoAction(Action):
                 subprocess.run(['git', '-C', repo_path, 'checkout', checkout], check=True)
             
             logger.info("Repository successfully pulled.")
+            logger.info("Registering the repo in repos.json")
+
+            # check the meta file to obtain uids
+            meta_file_path = os.path.join(repo_path, 'meta.yaml')
+            if not os.path.exists(meta_file_path):
+                logger.warning(f"meta.yaml not found in {repo_path}. Repo pulled but not register in mlc repos. Skipping...")
+                return
+            
+            with open(meta_file_path, 'r') as meta_file:
+                meta_data = yaml.safe_load(meta_file)
+                meta_data["path"] = repo_path
+
+            # Check UID conflicts
+            is_conflict = self.conflicting_repo(meta_data)
+            if is_conflict['return'] > 0:
+                if "UID not present" in is_conflict['error']:
+                    logger.warning(f"UID not found in meta.yaml at {repo_path}. Repo pulled but can not register in mlc repos. Skipping...")
+                    return
+                elif "already registered" in is_conflict["error"]:
+                    #logger.warning(is_conflict["error"])
+                    logger.info("No changes made to repos.json.")
+                else:
+                    logger.warning(f"The repo to be cloned has conflict with the repo already in the path: {is_conflict['conflicting_path']}")
+                    logger.warning(f"The repo currently being pulled will be registered in repos.json and already existing one would be unregistered.")
+                    self.unregister_repo(is_conflict['conflicting_path'])
+                    self.register_repo(meta_data)
+            else:         
+                self.register_repo(meta_data)
+
         except subprocess.CalledProcessError as e:
             logger.info(f"Git command failed: {e}")
         except Exception as e:
             logger.info(f"Error pulling repository: {str(e)}")
+
+    def pull(self, args):
+        repo_url = args.details if args.details else args.target_or_url
+        if repo_url == "repo":
+            for repo_object in self.repos:
+                repo_folder_name = os.path.basename(repo_object.path)
+                if "@" in repo_folder_name:
+                    self.pull_repo(repo_folder_name)
+        else:
+            branch = None
+            checkout = None
+            extras = args.extra
+            for item in extras:
+                split = item.split("=")
+                if split[0] == "--branch":
+                    branch = split[1]
+                elif split[0] == "--checkout":
+                    checkout = split[1]
+
+            self.pull_repo(repo_url, branch, checkout)
             
     def list(self, args):
         logger.info("Listing all repositories.")
@@ -889,12 +973,31 @@ class RepoAction(Action):
         logger.info("Repository listing ended")
     
     def rm(self, args):
-        # to be done
-        logger.info("Remove the repositories")
-        logger.info("WARNING: Function yet to be completed!")
+        logger.info("rm command has been called for repo. This would delete the repo folder and unregister the repo from repos.json")
+        
+        if not args.details:
+            logger.error("The repository to be removed is not specified")
+            return
+
+        repo_folder_name = args.details
+
+        repo_path = os.path.join(self.repos_path, repo_folder_name)
+
+        if os.path.exists(repo_path):
+            shutil.rmtree(repo_path)
+            logger.info(f"Repo {args.details} residing in path {repo_path} has been successfully removed")
+            logger.info("Checking whether the repo was registered in repos.json")
+        else:
+            logger.warning(f"Repo {args.details} was not found in the repo folder. repos.json will be checked for any corrupted entry. If any, that will be removed.")
+
+        self.unregister_repo(repo_path)
         
 
 class ScriptAction(Action):
+    def search(self, i):
+        if not i.get('target_name'):
+            i['target_name'] = "script"
+        return super().search(i)
 
     def dynamic_import_module(self, script_path):
         # Validate the script_path
@@ -951,18 +1054,8 @@ class ScriptAction(Action):
             elif key.startswith("-"):
                 run_args[key.strip("-")] = True
 
-    def run(self, args):
-        self.action_type = "script"
-        #logger.info(f"Running script with identifier: {args.details}")
-        # The REPOS folder is set by the user, for example via an environment variable.
-        repos_folder = self.repos_path
-        logger.info(f"In script action {repos_folder}")
-
-        # Import script submodule 
-        script_path = self.find_target_folder("script")
-        module_path = os.path.join(script_path, "module.py")
-        module = self.dynamic_import_module(module_path)
-
+    def get_script_run_args(self, args):
+        run_args = {}
         if "tags" in args: # # called through access function
             tags = args["tags"]
             cmd = args
@@ -978,6 +1071,57 @@ class ScriptAction(Action):
             run_args = {'action': 'run', 'automation': 'script', 'tags': tags, 'cmd': cmd, 'out': 'con',  'parsed_automation': [('script', '5b4e0237da074764')]}
             # update the run args with the extras that are supplied
             self.update_script_run_args(run_args, args.extra)
+        return {'return': 0, 'run_args': run_args}
+
+
+    def docker(self, args):
+        self.action_type = "script"
+        #logger.info(f"Running script with identifier: {args.details}")
+        # The REPOS folder is set by the user, for example via an environment variable.
+        repos_folder = self.repos_path
+        #logger.info(f"In script action {repos_folder}")
+
+        # Import script submodule 
+        script_path = self.find_target_folder("script")
+        module_path = os.path.join(script_path, "module.py")
+        module = self.dynamic_import_module(module_path)
+
+        res = self.get_script_run_args(args)
+        if res['return'] > 0:
+            return res
+        run_args = res['run_args']
+
+        # Check if ScriptAutomation is defined in the module
+        if hasattr(module, 'ScriptAutomation'):
+            automation_instance = module.ScriptAutomation(self, module_path)
+            #logger.info(f" script automation initialized at {module_path}")
+            #logger.info(run_args)
+            #return {'return': 1}
+            result = automation_instance.docker(run_args)  # Pass args to the run method
+            #logger.info(result)
+            if result['return'] > 0:
+                error = result.get('error', "")
+                raise ScriptExecutionError(f"Script docker execution failed. Error : {error}")
+            #logger.info(f"Script result: {result}")
+            return result
+        else:
+            logger.info("ScriptAutomation class not found in the script.")
+    def run(self, args):
+        self.action_type = "script"
+        #logger.info(f"Running script with identifier: {args.details}")
+        # The REPOS folder is set by the user, for example via an environment variable.
+        repos_folder = self.repos_path
+        #logger.info(f"In script action {repos_folder}")
+
+        # Import script submodule 
+        script_path = self.find_target_folder("script")
+        module_path = os.path.join(script_path, "module.py")
+        module = self.dynamic_import_module(module_path)
+
+        res = self.get_script_run_args(args)
+        if res['return'] > 0:
+            return res
+        run_args = res['run_args']
 
         # Check if ScriptAutomation is defined in the module
         if hasattr(module, 'ScriptAutomation'):
@@ -1004,12 +1148,17 @@ class ScriptExecutionError(Exception):
     pass
 
 class CacheAction(Action):
+    
+    def search(self, i):
+        i['target_name'] = "cache"
+        logger.debug(f"Searching for cache with input: {i}")
+        return super().search(i)
+
     def show(self, args):
         self.action_type = "cache"
         logger.info(f"Showing cache with identifier: {args.details}")
 
     def find(self, args):
-        self.action_type = "cache"
         #logger.info(f"Running script with identifier: {args.details}")
         # The REPOS folder is set by the user, for example via an environment variable.
         #logger.info(f"In cache action {repos_folder}")
@@ -1027,9 +1176,10 @@ class CacheAction(Action):
                     tags = opt[1]
             cmd = args.extra
             
-            run_args = {'action': 'run', 'automation': 'script', 'tags': tags, 'cmd': cmd, 'out': 'con',  'parsed_automation': [('cache', '541d6f712a6b464e')]}
+            run_args = {'action': 'run', 'automation': 'cache', 'tags': tags, 'cmd': cmd, 'out': 'con',  'parsed_automation': [('cache', '541d6f712a6b464e')]}
             #self.update_script_run_args(run_args, args.extra)
-
+        run_args['target_name'] = "cache"
+        #print(f"run_args = {run_args}")
         return self.search(run_args)
 
     def list(self, args):
@@ -1126,9 +1276,17 @@ def main():
     pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
-    for action in ['run', 'show', 'update', 'list', 'find']:
+    for action in ['run', 'show', 'update', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
+        # the argument given after target and before any extra options like --tags will be stored in "details"
+        action_parser.add_argument('details', nargs='?', help='Details or identifier (optional for list).')
+        action_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
+
+    # Script and specific subcommands
+    for action in ['docker', 'help']:
+        action_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
+        action_parser.add_argument('target', choices=['script'], help='Target type (script).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
         action_parser.add_argument('details', nargs='?', help='Details or identifier (optional for list).')
         action_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')

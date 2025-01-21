@@ -15,13 +15,14 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.11", "3.8"]
-        on: [ubuntu-latest, macos-latest]
+        on: [ubuntu-latest, macos-latest, windows-latest]
         backend: [ "onnxruntime", "tf" ]
         implementation: [ "python", "cpp" ]
         exclude:
           - backend: tf
             implementation: cpp
-  
+          - on: windows-latest
+            implementation: cpp
     runs-on: "${{ matrix.on }}"
     steps:
     - uses: actions/checkout@v4
@@ -39,6 +40,12 @@ jobs:
         python -m pip install .
         mlc pull repo mlcommons@mlperf-automations --branch=mlc
   
-    - name: Test MLPerf inference ResNet50
+    - name: Test MLPerf inference ResNet50 on Windows (prebuilt loadgen)
+      if: runner.os == 'Windows'
+      run: |
+        mlc run script --tags=run-mlperf,inference,_submission,_short --submitter="MLCommons" --hw_name=gh_action --model=resnet50 --implementation=${{ matrix.implementation }} --backend=${{ matrix.backend }} --device=cpu --scenario=Offline --test_query_count=100 --target_qps=1 -v --quiet --adr.loadgen.tags=_from-pip --pip_loadgen=yes
+
+    - name: Test MLPerf inference ResNet50 on Unix systems
+      if: runner.os != 'Windows'
       run: |
         mlc run script --tags=run-mlperf,inference,_submission,_short --submitter="MLCommons" --hw_name=gh_action --model=resnet50 --implementation=${{ matrix.implementation }} --backend=${{ matrix.backend }} --device=cpu --scenario=Offline --test_query_count=100 --target_qps=1 -v --quiet
