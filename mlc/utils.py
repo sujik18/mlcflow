@@ -6,10 +6,10 @@ import importlib.util
 import platform
 import json
 import yaml
-
-import os
 import uuid
 import shutil
+import tarfile
+import zipfile
 
 def generate_temp_file(i):
     """
@@ -513,3 +513,58 @@ def convert_tags_to_list(tags_string):
     tags_list = [tag.strip() for tag in tags_string.split(',') if tag.strip()]
 
     return {'return': 0, 'tags': tags_list}
+
+
+
+def extract_file(options):
+    """
+    Extracts a compressed file, optionally stripping folder levels.
+
+    Args:
+        options (dict): A dictionary with the following keys:
+            - 'filename' (str): The path to the compressed file to extract.
+            - 'strip_folders' (int, optional): The number of folder levels to strip. Default is 0.
+
+    Raises:
+        ValueError: If the file format is unsupported.
+        FileNotFoundError: If the specified file does not exist.
+    """
+    filename = options.get('filename')
+    strip_folders = options.get('strip_folders', 0)
+
+    if not filename or not os.path.exists(filename):
+        raise FileNotFoundError(f"File not found: {filename}")
+
+    extract_to = os.path.join(os.path.dirname(filename), "extracted")
+    os.makedirs(extract_to, exist_ok=True)
+
+    # Check file type and extract accordingly
+    if zipfile.is_zipfile(filename):
+        with zipfile.ZipFile(filename, 'r') as archive:
+            members = archive.namelist()
+            for member in members:
+                # Strip folder levels
+                stripped_path = os.path.join(
+                    extract_to, *member.split(os.sep)[strip_folders:]
+                )
+                if member.endswith('/'):  # Directory
+                    os.makedirs(stripped_path, exist_ok=True)
+                else:  # File
+                    os.makedirs(os.path.dirname(stripped_path), exist_ok=True)
+                    with archive.open(member) as source, open(stripped_path, 'wb') as target:
+                        shutil.copyfileobj(source, target)
+
+    elif tarfile.is_tarfile(filename):
+        with tarfile.open(filename, 'r') as archive:
+            members = archive.getmembers()
+            for member in members:
+                if strip_folders:
+                    parts = member.name.split('/')
+                    member.name = '/'.join(parts[strip_folders:])
+                archive.extract(member, path=extract_to)
+
+    else:
+        raise ValueError(f"Unsupported file format: {filename}")
+
+    print(f"Extraction complete. Files extracted to: {extract_to}")
+
