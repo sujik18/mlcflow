@@ -43,4 +43,4 @@ jobs:
       env:
         EXTRA_FLAGS: ${{ runner.os == 'Windows' && '--adr.loadgen.tags=_from-pip --pip_loadgen=yes' || '' }}
       run: |
-        mlc run script --tags=run-mlperf,inference,_submission,_short --submitter="MLCommons" --hw_name=gh_action --model=resnet50 --implementation=${{ matrix.implementation }} --backend=${{ matrix.backend }} --device=cpu --scenario=Offline --test_query_count=100 --target_qps=1 -v --quiet $EXTRA_FLAGS
+        mlc run script --tags=run-mlperf,inference,_submission,_short --submitter="MLCommons" --hw_name=gh_action --model=resnet50 --implementation=${{ matrix.implementation }} --backend=${{ matrix.backend }} --device=cpu --scenario=Offline --test_query_count=100 --target_qps=1 -v --quiet "${EXTRA_FLAGS}"
