@@ -165,7 +165,7 @@ class Action:
             if repo_object.meta.get('uid', '') == '':
                 return {"return": 1, "error": f"UID is not present in file 'meta.yaml' in the repo path {repo_object.path}"}
             if repo_meta["uid"] == repo_object.meta.get('uid', ''):
-                print(f"{repo_meta['path']} {repo_object.path}")
+                #print(f"{repo_meta['path']} {repo_object.path}")
                 if repo_meta['path'] == repo_object.path:
                     return {"return": 1, "error": f"Same repo is already registered"}
                 else:
@@ -773,17 +773,7 @@ class RepoAction(Action):
         else:
             raise ValueError("Invalid GitHub URL format")
 
-    def pull(self, args):
-        repo_url = args.details if args.details else args.target_or_url
-        branch = None
-        checkout = None
-        extras = args.extra
-        for item in extras:
-            split = item.split("=")
-            if split[0] == "--branch":
-                branch = split[1]
-            elif split[0] == "--checkout":
-                checkout = split[1]
+    def pull_repo(self, repo_url, branch=None, checkout = None):
         
         # Determine the checkout path from environment or default
         repo_base_path = self.repos_path # either the value will be from 'MLC_REPOS'
@@ -811,46 +801,6 @@ class RepoAction(Action):
                 
                 subprocess.run(clone_command, check=True)
 
-                #recursive cloning of the dependency repo still to be done
-
-                # dependencies = cmr_data.get('deps', [])
-                # for dep in dependencies:
-                #     dep_alias = dep.get('alias')
-                #     dep_uid = dep.get('uid')
-                #     if not dep_alias or not dep_uid:
-                #         logger.warning(f"Skipped a invalid dependency from {repo_name}")  # Skip invalid dependencies
-                #         continue
-
-                #     is_conflict = self.conflicting_repo({"uid": dep_uid})
-
-                #     # Check if the  dependency repo is already present. If yes then no need to clone again.
-                #     if is_conflict['return'] > 0:
-                #         if "conflicting" in is_conflict["error"]:
-                #             logger.warning(f"The {dep_alias} repo is not cloned as it is already registered in mlc repo")
-                #             continue
-                    
-                #     dep_args = args
-                #     dep_args.details = dep_alias
-
-                #     # call the function recursively
-                #     res = self.access({'action': 'pull',
-                #                 'automation': 'repo',
-                #                 'target_or_url': dep_alias,
-                #                 'details': dep_alias,
-                #                 'extra': args.extra})
-                #     if res['return'] > 0:
-                #         return res
-                    # self.pull(dep_args)
-
-
-
-                    
-
-                # res = self.access({'action': 'pull',
-                #             'automation': 'repo',
-                #             'item': 'default'})
-                # if res['return'] > 0:
-                #     return res
             else:
                 logger.info(f"Repository {repo_name} already exists at {repo_path}. Pulling latest changes...")
                 subprocess.run(['git', '-C', repo_path, 'pull'], check=True)
@@ -872,20 +822,17 @@ class RepoAction(Action):
             with open(meta_file_path, 'r') as meta_file:
                 meta_data = yaml.safe_load(meta_file)
                 meta_data["path"] = repo_path
-                print(meta_data)
 
             # Check UID conflicts
             is_conflict = self.conflicting_repo(meta_data)
             if is_conflict['return'] > 0:
                 if "UID not present" in is_conflict['error']:
-                    print("yes")
                     logger.warning(f"UID not found in meta.yaml at {repo_path}. Repo pulled but can not register in mlc repos. Skipping...")
                     return
                 elif "already registered" in is_conflict["error"]:
-                    logger.warning(is_conflict["error"])
+                    #logger.warning(is_conflict["error"])
                     logger.info("No changes made to repos.json.")
                 else:
-                    print("yeselse")
                     logger.warning(f"The repo to be cloned has conflict with the repo already in the path: {is_conflict['conflicting_path']}")
                     logger.warning(f"The repo currently being pulled will be registered in repos.json and already existing one would be unregistered.")
                     self.unregister_repo(is_conflict['conflicting_path'])
@@ -897,6 +844,26 @@ class RepoAction(Action):
             logger.info(f"Git command failed: {e}")
         except Exception as e:
             logger.info(f"Error pulling repository: {str(e)}")
+
+    def pull(self, args):
+        repo_url = args.details if args.details else args.target_or_url
+        if repo_url == "repo":
+            for repo_object in self.repos:
+                repo_folder_name = os.path.basename(repo_object.path)
+                if "@" in repo_folder_name:
+                    self.pull_repo(repo_folder_name)
+        else:
+            branch = None
+            checkout = None
+            extras = args.extra
+            for item in extras:
+                split = item.split("=")
+                if split[0] == "--branch":
+                    branch = split[1]
+                elif split[0] == "--checkout":
+                    checkout = split[1]
+
+            self.pull_repo(repo_url, branch, checkout)
             
     def list(self, args):
         logger.info("Listing all repositories.")
