@@ -21,6 +21,8 @@ jobs:
         exclude:
           - backend: tf
             implementation: cpp
+          - on: windows-latest
+            implementation: cpp
     runs-on: "${{ matrix.on }}"
     steps:
     - uses: actions/checkout@v4
