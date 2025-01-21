@@ -11,6 +11,7 @@ import logging
 from types import SimpleNamespace
 import mlc.utils as utils
 from pathlib import Path
+import shutil
 
 # Set up logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -161,7 +162,11 @@ class Action:
             if repo_object.meta.get('uid', '') == '':
                 return {"return": 1, "error": f"UID is not present in file 'meta.yaml' in the repo path {repo_object.path}"}
             if repo_meta["uid"] == repo_object.meta.get('uid', ''):
-                return {"return": 1, "error": f"Can not register repo as it's conflicting with repo in the path {repo_object.path}"}
+                print(f"{repo_meta['path']} {repo_object.path}")
+                if repo_meta['path'] == repo_object.path:
+                    return {"return": 1, "error": f"Same repo is already registered"}
+                else:
+                    return {"return": 1, "error": f"Conflicting with repo in the path {repo_object.path}", "conflicting_path": repo_object.path}
         return {"return": 0}
     
     def register_repo(self, repo_meta):
@@ -179,6 +184,21 @@ class Action:
         with open(repos_file_path, 'w') as f:
             json.dump(repos_list, f, indent=2)
             logger.info(f"Updated repos.json at {repos_file_path}")
+
+    def unregister_repo(self, repo_path):
+        logger.info(f"Unregistering the repo in path {repo_path}")
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
+
+        with open(repos_file_path, 'r') as f:
+            repos_list = json.load(f)
+        
+        if repo_path in repos_list:
+            repos_list.remove(repo_path)
+            with open(repos_file_path, 'w') as f:
+                json.dump(repos_list, f, indent=2)  
+            logger.info(f"Path: {repo_path} has been removed.")
+        else:
+            logger.info(f"Path: {repo_path} not found in {repos_file_path}. Nothing to be unregistered!")
 
 
     def __init__(self):        
@@ -785,28 +805,6 @@ class RepoAction(Action):
                 
                 subprocess.run(clone_command, check=True)
 
-                meta_file_path = os.path.join(repo_path, 'meta.yaml')
-                if not os.path.exists(meta_file_path):
-                    logger.warning(f"meta.yaml not found in {repo_path}. Repo pulled but not register in mlc repos. Skipping...")
-                    return
-                
-                with open(meta_file_path, 'r') as meta_file:
-                    meta_data = yaml.safe_load(meta_file)
-                    meta_data["path"] = repo_path
-
-                # Check UID conflicts
-                is_conflict = self.conflicting_repo(meta_data)
-                if is_conflict['return'] > 0:
-                    if "UID not present" in is_conflict['error']:
-                        logger.warning(f"UID not found in meta.yaml at {repo_path}. Repo pulled but can not register in mlc repos. Skipping...")
-                        return
-                    else:
-                        logger.warning(f"{is_conflict['error']} Repo pulled but can not register in mlc repos. Skipping...")
-                        return
-                    
-                self.register_repo(meta_data)
-
-
                 #recursive cloning of the dependency repo still to be done
 
                 # dependencies = cmr_data.get('deps', [])
@@ -857,6 +855,38 @@ class RepoAction(Action):
                 subprocess.run(['git', '-C', repo_path, 'checkout', checkout], check=True)
             
             logger.info("Repository successfully pulled.")
+            logger.info("Registering the repo in repos.json")
+
+            # check the meta file to obtain uids
+            meta_file_path = os.path.join(repo_path, 'meta.yaml')
+            if not os.path.exists(meta_file_path):
+                logger.warning(f"meta.yaml not found in {repo_path}. Repo pulled but not register in mlc repos. Skipping...")
+                return
+            
+            with open(meta_file_path, 'r') as meta_file:
+                meta_data = yaml.safe_load(meta_file)
+                meta_data["path"] = repo_path
+                print(meta_data)
+
+            # Check UID conflicts
+            is_conflict = self.conflicting_repo(meta_data)
+            if is_conflict['return'] > 0:
+                if "UID not present" in is_conflict['error']:
+                    print("yes")
+                    logger.warning(f"UID not found in meta.yaml at {repo_path}. Repo pulled but can not register in mlc repos. Skipping...")
+                    return
+                elif "already registered" in is_conflict["error"]:
+                    logger.warning(is_conflict["error"])
+                    logger.info("No changes made to repos.json.")
+                else:
+                    print("yeselse")
+                    logger.warning(f"The repo to be cloned has conflict with the repo already in the path: {is_conflict['conflicting_path']}")
+                    logger.warning(f"The repo currently being pulled will be registered in repos.json and already existing one would be unregistered.")
+                    self.unregister_repo(is_conflict['conflicting_path'])
+                    self.register_repo(meta_data)
+            else:         
+                self.register_repo(meta_data)
+
         except subprocess.CalledProcessError as e:
             logger.info(f"Git command failed: {e}")
         except Exception as e:
@@ -873,9 +903,24 @@ class RepoAction(Action):
         logger.info("Repository listing ended")
     
     def rm(self, args):
-        # to be done
-        logger.info("Remove the repositories")
-        logger.info("WARNING: Function yet to be completed!")
+        logger.info("rm command has been called for repo. This would delete the repo folder and unregister the repo from repos.json")
+        
+        if not args.details:
+            logger.error("The repository to be removed is not specified")
+            return
+
+        repo_folder_name = args.details
+
+        repo_path = os.path.join(self.repos_path, repo_folder_name)
+
+        if os.path.exists(repo_path):
+            shutil.rmtree(repo_path)
+            logger.info(f"Repo {args.details} residing in path {repo_path} has been successfully removed")
+            logger.info("Checking whether the repo was registered in repos.json")
+        else:
+            logger.warning(f"Repo {args.details} was not found in the repo folder. repos.json will be checked for any corrupted entry. If any, that will be removed.")
+
+        self.unregister_repo(repo_path)
         
 
 class ScriptAction(Action):
@@ -1110,7 +1155,7 @@ def main():
     pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
-    for action in ['run', 'show', 'update', 'list', 'find']:
+    for action in ['run', 'show', 'update', 'list', 'find', 'rm']:
         action_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
