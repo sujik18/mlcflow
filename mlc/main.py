@@ -44,12 +44,14 @@ class Action:
             return {'return': 1, 'error': "'action' key is required in options"}
         #logger.info(f"options = {options}")
 
+        #print(f"options = {options}")
         action_target = options.get('target')
         if not action_target:
             action_target = options.get('automation', 'script')  # Default to script if not provided
         action_target_split = action_target.split(",")
         action_target = action_target_split[0]
 
+        #print(f"action_target = {action_target}")
         action = actions.get(action_target)
         #logger.info(f"action = {action}")
 
@@ -57,6 +59,7 @@ class Action:
             if hasattr(action, action_name):
                 # Find the method and call it with the options
                 method = getattr(action, action_name)
+                #print(f"method = {method}, action = {action}, action_name  = {action_name}")
                 result = method(self, options)
                 #logger.info(f"result ={result}")
                 return result
@@ -427,7 +430,9 @@ class Action:
 
     def search(self, i):
         indices = self.index.indices
+        #print(f"search input = {i}")
         target = i.get('target_name', self.action_type)
+        #logger.debug(f"Search target = {target}")
         target_index = indices.get(target)
         result = []
         uid = i.get("uid")
@@ -448,6 +453,7 @@ class Action:
                     if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
                         it = Item(res['path'], res['repo'])
                         result.append(it)
+        #print(f"Search result for target {target} = {result}")
         return {'return': 0, 'list': result}
 
 
@@ -924,6 +930,10 @@ class RepoAction(Action):
         
 
 class ScriptAction(Action):
+    def search(self, i):
+        if not i.get('target_name'):
+            i['target_name'] = "script"
+        return super().search(i)
 
     def dynamic_import_module(self, script_path):
         # Validate the script_path
@@ -980,18 +990,8 @@ class ScriptAction(Action):
             elif key.startswith("-"):
                 run_args[key.strip("-")] = True
 
-    def run(self, args):
-        self.action_type = "script"
-        #logger.info(f"Running script with identifier: {args.details}")
-        # The REPOS folder is set by the user, for example via an environment variable.
-        repos_folder = self.repos_path
-        logger.info(f"In script action {repos_folder}")
-
-        # Import script submodule 
-        script_path = self.find_target_folder("script")
-        module_path = os.path.join(script_path, "module.py")
-        module = self.dynamic_import_module(module_path)
-
+    def get_script_run_args(self, args):
+        run_args = {}
         if "tags" in args: # # called through access function
             tags = args["tags"]
             cmd = args
@@ -1007,6 +1007,57 @@ class ScriptAction(Action):
             run_args = {'action': 'run', 'automation': 'script', 'tags': tags, 'cmd': cmd, 'out': 'con',  'parsed_automation': [('script', '5b4e0237da074764')]}
             # update the run args with the extras that are supplied
             self.update_script_run_args(run_args, args.extra)
+        return {'return': 0, 'run_args': run_args}
+
+
+    def docker(self, args):
+        self.action_type = "script"
+        #logger.info(f"Running script with identifier: {args.details}")
+        # The REPOS folder is set by the user, for example via an environment variable.
+        repos_folder = self.repos_path
+        #logger.info(f"In script action {repos_folder}")
+
+        # Import script submodule 
+        script_path = self.find_target_folder("script")
+        module_path = os.path.join(script_path, "module.py")
+        module = self.dynamic_import_module(module_path)
+
+        res = self.get_script_run_args(args)
+        if res['return'] > 0:
+            return res
+        run_args = res['run_args']
+
+        # Check if ScriptAutomation is defined in the module
+        if hasattr(module, 'ScriptAutomation'):
+            automation_instance = module.ScriptAutomation(self, module_path)
+            #logger.info(f" script automation initialized at {module_path}")
+            #logger.info(run_args)
+            #return {'return': 1}
+            result = automation_instance.docker(run_args)  # Pass args to the run method
+            #logger.info(result)
+            if result['return'] > 0:
+                error = result.get('error', "")
+                raise ScriptExecutionError(f"Script docker execution failed. Error : {error}")
+            #logger.info(f"Script result: {result}")
+            return result
+        else:
+            logger.info("ScriptAutomation class not found in the script.")
+    def run(self, args):
+        self.action_type = "script"
+        #logger.info(f"Running script with identifier: {args.details}")
+        # The REPOS folder is set by the user, for example via an environment variable.
+        repos_folder = self.repos_path
+        #logger.info(f"In script action {repos_folder}")
+
+        # Import script submodule 
+        script_path = self.find_target_folder("script")
+        module_path = os.path.join(script_path, "module.py")
+        module = self.dynamic_import_module(module_path)
+
+        res = self.get_script_run_args(args)
+        if res['return'] > 0:
+            return res
+        run_args = res['run_args']
 
         # Check if ScriptAutomation is defined in the module
         if hasattr(module, 'ScriptAutomation'):
@@ -1033,12 +1084,17 @@ class ScriptExecutionError(Exception):
     pass
 
 class CacheAction(Action):
+    
+    def search(self, i):
+        i['target_name'] = "cache"
+        logger.debug(f"Searching for cache with input: {i}")
+        return super().search(i)
+
     def show(self, args):
         self.action_type = "cache"
         logger.info(f"Showing cache with identifier: {args.details}")
 
     def find(self, args):
-        self.action_type = "cache"
         #logger.info(f"Running script with identifier: {args.details}")
         # The REPOS folder is set by the user, for example via an environment variable.
         #logger.info(f"In cache action {repos_folder}")
@@ -1056,9 +1112,10 @@ class CacheAction(Action):
                     tags = opt[1]
             cmd = args.extra
             
-            run_args = {'action': 'run', 'automation': 'script', 'tags': tags, 'cmd': cmd, 'out': 'con',  'parsed_automation': [('cache', '541d6f712a6b464e')]}
+            run_args = {'action': 'run', 'automation': 'cache', 'tags': tags, 'cmd': cmd, 'out': 'con',  'parsed_automation': [('cache', '541d6f712a6b464e')]}
             #self.update_script_run_args(run_args, args.extra)
-
+        run_args['target_name'] = "cache"
+        #print(f"run_args = {run_args}")
         return self.search(run_args)
 
     def list(self, args):
@@ -1155,9 +1212,17 @@ def main():
     pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
-    for action in ['run', 'show', 'update', 'list', 'find', 'rm']:
+    for action in ['run', 'show', 'update', 'list', 'find', 'search', 'rm']:
         action_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
+        # the argument given after target and before any extra options like --tags will be stored in "details"
+        action_parser.add_argument('details', nargs='?', help='Details or identifier (optional for list).')
+        action_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
+
+    # Script and specific subcommands
+    for action in ['docker', 'help']:
+        action_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
+        action_parser.add_argument('target', choices=['script'], help='Target type (script).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
         action_parser.add_argument('details', nargs='?', help='Details or identifier (optional for list).')
         action_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
