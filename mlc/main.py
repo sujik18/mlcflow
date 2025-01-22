@@ -29,7 +29,9 @@ class ColoredFormatter(logging.Formatter):
             record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
         return super().format(record)
 
-# Set up logging configuration with the custom formatter
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -47,6 +49,26 @@ logger.addHandler(console_handler)
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 # logger = logging.getLogger(__name__)
 
+
+# Set up logging configuration
+def setup_logging(log_path = '.\mlc',log_file = 'mlc-log.txt'):
+    
+    logFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # File hander for logging in file in the specified path
+    file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
+    file_handler.setFormatter(logFormatter)
+    logger.addHandler(file_handler)
+    
+    # Console handler for logging on console
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(logFormatter)
+    logger.addHandler(consoleHandler)
+
+# Testing the log  
+# setup_logging(log_path='.',log_file='mlc-log2.txt')
+# logger = logging.getLogger(__name__)
+# logger.info('This is an info message')
 
 # Base class for CLI actions
 class Action:
@@ -385,7 +407,8 @@ class Action:
 
         # Save metadata
         meta_format = "yaml" if i.get("yaml") else "json"
-        item_meta_path = os.path.join(item_path, f"_cm.{meta_format}")
+        item_meta_path = os.path.join(item_path, f"meta.{meta_format}")
+
         if meta_format == "yaml":
             save_result = utils.save_yaml(item_meta_path, meta=item_meta)
         else:
@@ -446,7 +469,7 @@ class Action:
         for item in found_items:
             meta = {}
             # Load the current meta of the item
-            item_meta_path = os.path.join(item.path, "_cm.json")
+            item_meta_path = os.path.join(item.path, "meta.json")
             if os.path.exists(item_meta_path):
                 res = utils.load_json(item_meta_path)
                 if res['return']> 0:
@@ -489,7 +512,6 @@ class Action:
         return bool(re.fullmatch(hex_uid_pattern, name))
 
     def cp(self, args):
-        #print(f"args = {args}")
         action_target = args.target
         src_item = args.details
         target_item = args.extra[0]
@@ -517,38 +539,63 @@ class Action:
         else:
             result = res['list'][0]
             src_item_path = result.path
-            src_repo_path = result.repo_path
             src_item_meta = result.meta
 
 
         if len(target_split) > 1:
             target_repo = target_split[0]
             target_repo_path = os.path.join(self.repo_path, target_repo)
-            #target_repo_meta.path
+            target_repo = Repo(target_repo_path)
             target_item_name = target_split[1]
         else:
-            target_repo_path = src_repo_path  #use the src repo itself
-            target_repo_meta = result.repo_meta
+            target_repo = result.repo
+            target_repo_path = result.repo.path
             target_item_name = target_split[0]
 
         target_item_path = os.path.join(target_repo_path, action_target, target_item)
-        print(f"src_path = {src_item_path}, target_item = {target_item_name}, target_item_path = {target_item_path}, target_meta = {target_repo_meta}")
-        target_repo = Repo(target_repo_path, target_repo_meta)
-        target_item = Item(target_item_path, target_repo)
-        return 1
-        self.copy_item_with_meta(src_path, target_item_path, src_item_meta)
-
-        ii = {}
-        res = self.save_new_meta(ii, item_id, target_item, action_target, target_item_path, repo_meta, target_repo_path)
+        #print(f"src_path = {src_item_path}, target_item = {target_item_name}, target_item_path = {target_item_path}, target_repo = {target_repo}")
+        res = self.copy_item(src_item_path, target_item_path)
         if res['return'] > 0:
             return res
 
+        ii = {}
+        ii['meta'] = result.meta
+        if action_target == "script":
+            ii['yaml'] = True
 
-    def copy_item_with_meta(self, source_path, destination_path):
+        tags = None
+        item_id = None
+        for i in range(len(args.extra)):
+            if "=" in args.extra[i]:
+                split = args.extra[i].split("=")
+                if split[0] == "--tags":
+                    tags = split[1]
+                if split[0] == "--item_id":
+                    item_id = split[1]
+
+        if tags:
+            ii['tags'] = tags
+
+        # Generate a new UID if not provided
+        if not item_id:
+            res = utils.get_new_uid()
+            if res['return'] > 0:
+                return res
+            item_id = res['uid']
+
+        res = self.save_new_meta(ii, item_id, target_item_name, action_target, target_item_path, target_repo)
+
+        if res['return'] > 0:
+            return res
+        logging.info(f"{action_target} {src_item_path} copied to {target_item_path}")
+
+        return {'return': 0}
+
+    def copy_item(self, source_path, destination_path):
         try:
             # Copy the source folder to the destination
             shutil.copytree(source_path, destination_path)
-            print(f"Folder successfully copied from {source_path} to {destination_path}")
+            logging.info(f"Folder successfully copied from {source_path} to {destination_path}")
         except FileExistsError:
             return {'return': 1, 'error': f"Destination folder {destination_path} already exists."}
         except FileNotFoundError:
@@ -556,7 +603,7 @@ class Action:
         except Exception as e:
             return {'return': 1, 'error': f"An error occurred {e}"}
 
-        #fix the uid in the meta
+        return {'return': 0}
 
     def search(self, i):
         indices = self.index.indices
@@ -681,8 +728,8 @@ class Index:
                     if not os.path.isdir(automation_path):
                         continue
 
-                    # Check for configuration files (_cm.yaml or _cm.json)
-                    for config_file in ["_cm.yaml", "_cm.json"]:
+                    # Check for configuration files (meta.yaml or meta.json)
+                    for config_file in ["meta.yaml", "meta.json"]:
                         config_path = os.path.join(automation_path, config_file)
                         if os.path.isfile(config_path):
                             self._process_config_file(config_path, folder_type, automation_path, repo)
@@ -691,7 +738,7 @@ class Index:
 
     def _process_config_file(self, config_file, folder_type, folder_path, repo):
         """
-        Process a single configuration file (_cm.json or _cm.yaml) and add its data to the corresponding index.
+        Process a single configuration file (meta.json or meta.yaml) and add its data to the corresponding index.
 
         Args:
             config_file (str): Path to the configuration file.
@@ -745,11 +792,21 @@ class Index:
             output_file = self.index_files[folder_type]
             try:
                 with open(output_file, "w") as f:
-                    json.dump(index_data, f, indent=4)
+                    json.dump(index_data, f, indent=4, cls=CustomJSONEncoder)
                 logger.info(f"Shared index for {folder_type} saved to {output_file}.")
             except Exception as e:
                 logger.error(f"Error saving shared index for {folder_type}: {e}")
 
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Repo):
+            # Customize how to serialize the Repo object
+            return {
+                "path": obj.path,
+                "meta": obj.meta,
+            }
+        # For other unknown types, use the default behavior
+        return super().default(obj)
 
 class Item:
     def __init__(self, path, repo):
@@ -760,8 +817,8 @@ class Item:
 
 
     def _load_meta(self):
-        yaml_file = os.path.join(self.path, "_cm.yaml")
-        json_file = os.path.join(self.path, "_cm.json")
+        yaml_file = os.path.join(self.path, "meta.yaml")
+        json_file = os.path.join(self.path, "meta.json")
 
         if os.path.exists(yaml_file):
             self.meta = utils.read_yaml(yaml_file)
@@ -806,8 +863,8 @@ class Automation:
         self._load_meta()
 
     def _load_meta(self):
-        yaml_file = os.path.join(self.path, "_cm.yaml")
-        json_file = os.path.join(self.path, "_cm.json")
+        yaml_file = os.path.join(self.path, "meta.yaml")
+        json_file = os.path.join(self.path, "meta.json")
 
         if os.path.exists(yaml_file):
             self.meta = utils.read_yaml(yaml_file)
@@ -1314,7 +1371,7 @@ def main():
     # Parse arguments
     args = parser.parse_args()
 
-    logger.info(f"Args = {args}")
+    #logger.info(f"Args = {args}")
 
 
     # Parse extra options into a dictionary
@@ -1351,7 +1408,9 @@ def main():
         # Dynamically call the method (e.g., run, list, show)
         if action and hasattr(action, args.command):
             method = getattr(action, args.command)
-            method(args)
+            res = method(args)
+            if res['return'] > 0:
+                logger.error(res.get('error', f"Error in {action}"))
         else:
             logger.error(f"Error: '{args.command}' is not supported for {args.target}.")
 

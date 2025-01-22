@@ -306,6 +306,27 @@ def save_json(file_name, meta):
     except Exception as e:
         return {'return': 1, 'error': str(e)}
 
+
+def save_yaml(file_name, meta):
+    """
+    Saves the provided meta data to a YAML file.
+
+    Args:
+        file_name (str): The name of the file where the YAML data will be saved.
+        meta (dict): The dictionary containing the data to be saved in YAML format.
+
+    Returns:
+        dict: A dictionary indicating success or failure of the operation.
+            - 'return' (int): 0 if the operation was successful, > 0 if an error occurred.
+            - 'error' (str): Error message, if any error occurred.
+    """
+    try:
+        with open(file_name, 'w') as f:
+            yaml.dump(meta, f, default_flow_style=False, sort_keys=False)
+        return {'return': 0, 'error': ''}
+    except Exception as e:
+        return {'return': 1, 'error': str(e)}
+
 def save_txt(file_name, string):
     """
     Saves the provided string to a text file.
