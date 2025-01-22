@@ -13,9 +13,28 @@ import mlc.utils as utils
 from pathlib import Path
 import shutil
 
-# Set up logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Set up logging configuration
+def setup_logging(log_path = '.\mlc',log_file = 'mlc-log.txt'):
+    
+    logFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # File hander for logging in file in the specified path
+    file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
+    file_handler.setFormatter(logFormatter)
+    logger.addHandler(file_handler)
+    
+    # Console handler for logging on console
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(logFormatter)
+    logger.addHandler(consoleHandler)
+
+# Testing the log  
+# setup_logging(log_path='.',log_file='mlc-log2.txt')
+# logger = logging.getLogger(__name__)
+# logger.info('This is an info message')
 
 # Base class for CLI actions
 class Action:
