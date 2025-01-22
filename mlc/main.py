@@ -473,10 +473,10 @@ class Action:
         # Check if the name matches the pattern
         return bool(re.fullmatch(hex_uid_pattern, name))
 
-    def cp(self, args):
-        action_target = args.target
-        src_item = args.details
-        target_item = args.extra[0]
+    def cp(self, run_args):
+        action_target = run_args['target']
+        src_item = run_args['src']
+        target_item = run_args['dest']
         src_split = src_item.split(":")
         target_split = target_item.split(":")
         if len(src_split) > 1:
@@ -525,15 +525,8 @@ class Action:
         if action_target == "script":
             ii['yaml'] = True
 
-        tags = None
-        item_id = None
-        for i in range(len(args.extra)):
-            if "=" in args.extra[i]:
-                split = args.extra[i].split("=")
-                if split[0] == "--tags":
-                    tags = split[1]
-                if split[0] == "--item_id":
-                    item_id = split[1]
+        tags = run_args.get('tags')
+        item_id = run_args.get('item_id')
 
         if tags:
             ii['tags'] = tags
@@ -1240,7 +1233,7 @@ def main():
 
     # Script and Cache-specific subcommands
     for action in ['run', 'show', 'update', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
-        action_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
+        action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
         action_parser.add_argument('details', nargs='?', help='Details or identifier (optional for list).')
@@ -1267,9 +1260,17 @@ def main():
     res = utils.convert_args_to_dictionary(args.extra)
     if res['return'] > 0:
         return res
+
     run_args = res['args_dict']
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
+
+    if args.command in ["cp", "mv"]:
+        run_args['target'] = args.target
+        if hasattr(args, 'details') and args.details:
+            run_args['src'] = args.details
+        if hasattr(args, 'extra') and args.extra:
+            run_args['dest'] = args.extra[0]
 
     # Get the action handler for other commands
     action = get_action(args.target)
