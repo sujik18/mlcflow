@@ -355,6 +355,7 @@ class Action:
         # Save metadata
         meta_format = "yaml" if i.get("yaml") else "json"
         item_meta_path = os.path.join(item_path, f"meta.{meta_format}")
+
         if meta_format == "yaml":
             save_result = utils.save_yaml(item_meta_path, meta=item_meta)
         else:
@@ -458,7 +459,6 @@ class Action:
         return bool(re.fullmatch(hex_uid_pattern, name))
 
     def cp(self, args):
-        #print(f"args = {args}")
         action_target = args.target
         src_item = args.details
         target_item = args.extra[0]
@@ -496,26 +496,53 @@ class Action:
             target_item_name = target_split[1]
         else:
             target_repo = result.repo
+            target_repo_path = result.repo.path
             target_item_name = target_split[0]
 
         target_item_path = os.path.join(target_repo_path, action_target, target_item)
-        print(f"src_path = {src_item_path}, target_item = {target_item_name}, target_item_path = {target_item_path}, target_repo = {target_repo}")
-        self.copy_item(src_path, target_item_path)
-        target_item = Item(target_item_path, target_repo)
-        return 1
-        self.copy_item(src_path, target_item_path)
-
-        ii = {}
-        res = self.save_new_meta(ii, item_id, target_item, action_target, target_item_path, repo_meta, target_repo_path)
+        #print(f"src_path = {src_item_path}, target_item = {target_item_name}, target_item_path = {target_item_path}, target_repo = {target_repo}")
+        res = self.copy_item(src_item_path, target_item_path)
         if res['return'] > 0:
             return res
 
+        ii = {}
+        ii['meta'] = result.meta
+        if action_target == "script":
+            ii['yaml'] = True
+
+        tags = None
+        item_id = None
+        for i in range(len(args.extra)):
+            if "=" in args.extra[i]:
+                split = args.extra[i].split("=")
+                if split[0] == "--tags":
+                    tags = split[1]
+                if split[0] == "--item_id":
+                    item_id = split[1]
+
+        if tags:
+            ii['tags'] = tags
+
+        # Generate a new UID if not provided
+        if not item_id:
+            res = utils.get_new_uid()
+            if res['return'] > 0:
+                return res
+            item_id = res['uid']
+
+        res = self.save_new_meta(ii, item_id, target_item_name, action_target, target_item_path, target_repo)
+
+        if res['return'] > 0:
+            return res
+        logging.info(f"{action_target} {src_item_path} copied to {target_item_path}")
+
+        return {'return': 0}
 
     def copy_item(self, source_path, destination_path):
         try:
             # Copy the source folder to the destination
             shutil.copytree(source_path, destination_path)
-            print(f"Folder successfully copied from {source_path} to {destination_path}")
+            logging.info(f"Folder successfully copied from {source_path} to {destination_path}")
         except FileExistsError:
             return {'return': 1, 'error': f"Destination folder {destination_path} already exists."}
         except FileNotFoundError:
@@ -523,7 +550,7 @@ class Action:
         except Exception as e:
             return {'return': 1, 'error': f"An error occurred {e}"}
 
-        #fix the uid in the meta
+        return {'return': 0}
 
     def search(self, i):
         indices = self.index.indices
@@ -712,11 +739,21 @@ class Index:
             output_file = self.index_files[folder_type]
             try:
                 with open(output_file, "w") as f:
-                    json.dump(index_data, f, indent=4)
+                    json.dump(index_data, f, indent=4, cls=CustomJSONEncoder)
                 logger.info(f"Shared index for {folder_type} saved to {output_file}.")
             except Exception as e:
                 logger.info(f"Error saving shared index for {folder_type}: {e}")
 
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Repo):
+            # Customize how to serialize the Repo object
+            return {
+                "path": obj.path,
+                "meta": obj.meta,
+            }
+        # For other unknown types, use the default behavior
+        return super().default(obj)
 
 class Item:
     def __init__(self, path, repo):
@@ -1279,7 +1316,7 @@ def main():
     # Parse arguments
     args = parser.parse_args()
 
-    logger.info(f"Args = {args}")
+    #logger.info(f"Args = {args}")
 
 
     # Parse extra options into a dictionary
@@ -1316,7 +1353,9 @@ def main():
         # Dynamically call the method (e.g., run, list, show)
         if action and hasattr(action, args.command):
             method = getattr(action, args.command)
-            method(args)
+            res = method(args)
+            if res['return'] > 0:
+                logger.error(res.get('error', f"Error in {action}"))
         else:
             logger.info(f"Error: '{args.command}' is not supported for {args.target}.")
 
