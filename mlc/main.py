@@ -1017,10 +1017,10 @@ class RepoAction(Action):
 
         if os.path.exists(repo_path):
             shutil.rmtree(repo_path)
-            logger.info(f"Repo {args.details} residing in path {repo_path} has been successfully removed")
+            logger.info(f"Repo {run_args['repo']} residing in path {repo_path} has been successfully removed")
             logger.info("Checking whether the repo was registered in repos.json")
         else:
-            logger.warning(f"Repo {args.details} was not found in the repo folder. repos.json will be checked for any corrupted entry. If any, that will be removed.")
+            logger.warning(f"Repo {run_args['repo']} was not found in the repo folder. repos.json will be checked for any corrupted entry. If any, that will be removed.")
 
         self.unregister_repo(repo_path)
 
@@ -1082,7 +1082,6 @@ class ScriptAction(Action):
 
     def run(self, run_args):
         self.action_type = "script"
-        #logger.info(f"Running script with identifier: {args.details}")
         # The REPOS folder is set by the user, for example via an environment variable.
         repos_folder = self.repos_path
         #logger.info(f"In script action {repos_folder}")
@@ -1269,6 +1268,8 @@ def main():
     if res['return'] > 0:
         return res
     run_args = res['args_dict']
+    if args.repo:
+        run_args['repo'] = args.repo
 
     # Get the action handler for other commands
     action = get_action(args.target)
