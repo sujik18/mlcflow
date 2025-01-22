@@ -13,9 +13,28 @@ import mlc.utils as utils
 from pathlib import Path
 import shutil
 
-# Set up logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Set up logging configuration
+def setup_logging(log_path = '.\mlc',log_file = 'mlc-log.txt'):
+    
+    logFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # File hander for logging in file in the specified path
+    file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
+    file_handler.setFormatter(logFormatter)
+    logger.addHandler(file_handler)
+    
+    # Console handler for logging on console
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(logFormatter)
+    logger.addHandler(consoleHandler)
+
+# Testing the log  
+# setup_logging(log_path='.',log_file='mlc-log2.txt')
+# logger = logging.getLogger(__name__)
+# logger.info('This is an info message')
 
 # Base class for CLI actions
 class Action:
@@ -883,9 +902,9 @@ class RepoAction(Action):
         match = re.match(pattern, url)
         if match:
             user, repo_name = match.groups()
-            return f"{user}@{repo_name}"
+            return {"return": 0, "value": f"{user}@{repo_name}"}
         else:
-            raise ValueError("Invalid GitHub URL format")
+            return {"return": 1, "error": f"Invalid GitHub URL format: {url}"} 
 
     def pull_repo(self, repo_url, branch=None, checkout = None):
         
@@ -900,8 +919,12 @@ class RepoAction(Action):
 
         # Extract the repo name from URL
         repo_name = repo_url.split('/')[-1].replace('.git', '')
-        repo_download_name = self.github_url_to_user_repo_format(repo_url)
-        repo_path = os.path.join(repo_base_path, repo_download_name)
+        res = self.github_url_to_user_repo_format(repo_url)
+        if res["return"] > 0:
+            return res
+        else:
+            repo_download_name = res["value"]
+            repo_path = os.path.join(repo_base_path, repo_download_name)
 
         try:
             # If the directory doesn't exist, clone it
@@ -931,7 +954,7 @@ class RepoAction(Action):
             meta_file_path = os.path.join(repo_path, 'meta.yaml')
             if not os.path.exists(meta_file_path):
                 logger.warning(f"meta.yaml not found in {repo_path}. Repo pulled but not register in mlc repos. Skipping...")
-                return
+                return {"return": 0}
             
             with open(meta_file_path, 'r') as meta_file:
                 meta_data = yaml.safe_load(meta_file)
@@ -942,7 +965,7 @@ class RepoAction(Action):
             if is_conflict['return'] > 0:
                 if "UID not present" in is_conflict['error']:
                     logger.warning(f"UID not found in meta.yaml at {repo_path}. Repo pulled but can not register in mlc repos. Skipping...")
-                    return
+                    return {"return": 0}
                 elif "already registered" in is_conflict["error"]:
                     #logger.warning(is_conflict["error"])
                     logger.info("No changes made to repos.json.")
@@ -951,8 +974,10 @@ class RepoAction(Action):
                     logger.warning(f"The repo currently being pulled will be registered in repos.json and already existing one would be unregistered.")
                     self.unregister_repo(is_conflict['conflicting_path'])
                     self.register_repo(meta_data)
+                    return {"return": 0}
             else:         
                 self.register_repo(meta_data)
+                return {"return": 0}
 
         except subprocess.CalledProcessError as e:
             logger.info(f"Git command failed: {e}")
@@ -965,7 +990,7 @@ class RepoAction(Action):
             for repo_object in self.repos:
                 repo_folder_name = os.path.basename(repo_object.path)
                 if "@" in repo_folder_name:
-                    self.pull_repo(repo_folder_name)
+                    return self.pull_repo(repo_folder_name)
         else:
             branch = None
             checkout = None
@@ -977,7 +1002,7 @@ class RepoAction(Action):
                 elif split[0] == "--checkout":
                     checkout = split[1]
 
-            self.pull_repo(repo_url, branch, checkout)
+            return self.pull_repo(repo_url, branch, checkout)
             
     def list(self, args):
         logger.info("Listing all repositories.")
@@ -988,13 +1013,14 @@ class RepoAction(Action):
             print(f"  Path:  {repo_object.path}\n")
         print("-------------")
         logger.info("Repository listing ended")
+        return {"return": 0}
     
     def rm(self, args):
         logger.info("rm command has been called for repo. This would delete the repo folder and unregister the repo from repos.json")
         
         if not args.details:
             logger.error("The repository to be removed is not specified")
-            return
+            return {"return": 1, "error": "The repository to be removed is not specified"}
 
         repo_folder_name = args.details
 
@@ -1008,6 +1034,8 @@ class RepoAction(Action):
             logger.warning(f"Repo {args.details} was not found in the repo folder. repos.json will be checked for any corrupted entry. If any, that will be removed.")
 
         self.unregister_repo(repo_path)
+
+        return {"return": 0}
         
 
 class ScriptAction(Action):
@@ -1351,11 +1379,15 @@ def main():
         # If the first argument looks like a URL, assume repo pull
         if args.target_or_url.startswith("http"):
             action = RepoAction()
-            action.pull(args)
+            res = action.pull(args)
+            if res["return"] > 0:
+                logger.error(res.get('error', f"Error in repo action: {res['error']}"))
         else:
             action = get_action(args.target_or_url)
             if action and hasattr(action, 'pull'):
-                action.pull(args)
+                res = action.pull(args)
+                if res["return"] > 0:
+                    logger.error(res.get('error', f"Error in repo action: {res['error']}"))
             else:
                 logger.info(f"Error: '{args.target_or_url}' is not a valid target for pull.")
     else:
