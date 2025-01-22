@@ -970,9 +970,9 @@ class RepoAction(Action):
                 return {"return": 0}
 
         except subprocess.CalledProcessError as e:
-            logger.info(f"Git command failed: {e}")
+            return {'return': 1, 'error': f"Git command failed: {e}"}
         except Exception as e:
-            logger.info(f"Error pulling repository: {str(e)}")
+            return {'return': 1, 'error': f"Error pulling repository: {str(e)}"}
 
     def pull(self, run_args):
         repo_url = run_args.get('repo', 'repo')
@@ -980,18 +980,18 @@ class RepoAction(Action):
             for repo_object in self.repos:
                 repo_folder_name = os.path.basename(repo_object.path)
                 if "@" in repo_folder_name:
-                    return self.pull_repo(repo_folder_name)
+                    res = self.pull_repo(repo_folder_name)
+                    if res['return'] > 0:
+                        return res
         else:
-            branch = None
-            checkout = None
-            for item in run_args:
-                split = item.split("=")
-                if split[0] == "--branch":
-                    branch = split[1]
-                elif split[0] == "--checkout":
-                    checkout = split[1]
+            branch = run_args.get('branch')
+            checkout = run_args.get('checkout')
 
-            return self.pull_repo(repo_url, branch, checkout)
+            res = self.pull_repo(repo_url, branch, checkout)
+            if res['return'] > 0:
+                return res
+
+        return {'return': 0}
             
     def list(self, run_args):
         logger.info("Listing all repositories.")
