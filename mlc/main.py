@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # Set up logging configuration
-def setup_logging(log_path = '.\mlc',log_file = 'mlc-log.txt'):
+def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
     
     logFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
@@ -83,8 +83,6 @@ class Action:
                 result = method(self, options)
                 #logger.info(f"result ={result}")
                 return result
-                #if result['return'] > 0:
-                #    return result
             else:
                 return {'return': 1, 'error': f"'{action_name}' action is not supported for {action_target}."}
         else:
@@ -96,8 +94,6 @@ class Action:
         if not os.path.exists(self.repos_path):
             os.makedirs(self.repos_path, exist_ok=True)
         for repo_dir in os.listdir(self.repos_path):
-            #if "mlc" not in repo_dir:
-            #    continue
             repo_path = os.path.join(self.repos_path, repo_dir)
             if os.path.isdir(repo_path):
                 automation_folder = os.path.join(repo_path, 'automation')
@@ -574,10 +570,7 @@ class Action:
     def search(self, i):
         indices = self.index.indices
         #print(f"search input = {i}")
-        #print(f"Cache search i = {i}")
-        #return {'return': 1}
         target = i.get('target_name', self.action_type)
-        #logger.debug(f"Search target = {target}")
         target_index = indices.get(target)
         result = []
         uid = i.get("uid")
@@ -867,18 +860,14 @@ class Automation:
 # Extends Action class
 class RepoAction(Action):
 
-    def find(self, args):
-        if isinstance(args, dict):
-            repo = args.get('item', args.get('artifact'))
-        else:
-            repo = args.details
+    def find(self, run_args):
+        repo = run_args.get('item', run_args.get('artifact'))
         repo_split = repo.split(",")
         if len(repo_split) > 1:
             repo_uid = repo_split[1]
         repo_name = repo_split[0]
 
         lst = []
-        #print(f"args = {args}")
         for i in self.repos:
             if repo_uid and i.meta['uid'] == repo_uid:
                 lst.append(i)
@@ -984,8 +973,8 @@ class RepoAction(Action):
         except Exception as e:
             logger.info(f"Error pulling repository: {str(e)}")
 
-    def pull(self, args):
-        repo_url = args.details if args.details else args.target_or_url
+    def pull(self, run_urgs):
+        repo_url = run_args['repo']#args.details if args.details else args.target_or_url
         if repo_url == "repo":
             for repo_object in self.repos:
                 repo_folder_name = os.path.basename(repo_object.path)
@@ -994,8 +983,7 @@ class RepoAction(Action):
         else:
             branch = None
             checkout = None
-            extras = args.extra
-            for item in extras:
+            for item in run_args:
                 split = item.split("=")
                 if split[0] == "--branch":
                     branch = split[1]
@@ -1004,7 +992,7 @@ class RepoAction(Action):
 
             return self.pull_repo(repo_url, branch, checkout)
             
-    def list(self, args):
+    def list(self, run_args):
         logger.info("Listing all repositories.")
         print("\nRepositories:")
         print("-------------")
@@ -1015,14 +1003,14 @@ class RepoAction(Action):
         logger.info("Repository listing ended")
         return {"return": 0}
     
-    def rm(self, args):
+    def rm(self, run_args):
         logger.info("rm command has been called for repo. This would delete the repo folder and unregister the repo from repos.json")
         
-        if not args.details:
+        if not run_args['repo']:
             logger.error("The repository to be removed is not specified")
             return {"return": 1, "error": "The repository to be removed is not specified"}
 
-        repo_folder_name = args.details
+        repo_folder_name = run_args['repo']
 
         repo_path = os.path.join(self.repos_path, repo_folder_name)
 
@@ -1067,59 +1055,7 @@ class ScriptAction(Action):
 
         return module
 
-    def update_script_run_args(self, run_args, inp):
-        for key in inp:
-            if "=" in key:
-                split = key.split("=", 1)  # Split only on the first "="
-                arg_key = split[0].strip("-")
-                arg_value = split[1]
-
-                # Handle lists: Only if "," is immediately before the "="
-                if "," in arg_key:
-                    list_key, list_values = arg_key.rsplit(",", 1)
-                    if not list_values:  # Ensure "=" follows the last comma
-                        run_args[list_key] = arg_value.split(",")
-                        continue
-
-                # Handle dictionaries: `--adr.compiler.tags=gcc` becomes `{"adr": {"compiler": {"tags": "gcc"}}}`
-                elif "." in arg_key:
-                    keys = arg_key.split(".")
-                    current = run_args
-                    for part in keys[:-1]:
-                        if part not in current or not isinstance(current[part], dict):
-                            current[part] = {}
-                        current = current[part]
-                    current[keys[-1]] = arg_value
-            
-                # Handle simple key-value pairs
-                else:
-                    run_args[arg_key] = arg_value
-        
-            # Handle flags: `--flag` becomes `{"flag": True}`
-            elif key.startswith("-"):
-                run_args[key.strip("-")] = True
-
-    def get_script_run_args(self, args):
-        run_args = {}
-        if "tags" in args: # # called through access function
-            tags = args["tags"]
-            cmd = args
-            run_args = args
-        else:
-            tags = ""
-            for option in args.extra:
-                opt = option.split("=")
-                if opt[0] == "--tags":
-                    tags = opt[1]
-            cmd = args.extra
-            
-            run_args = {'action': 'run', 'automation': 'script', 'tags': tags, 'cmd': cmd, 'out': 'con',  'parsed_automation': [('script', '5b4e0237da074764')]}
-            # update the run args with the extras that are supplied
-            self.update_script_run_args(run_args, args.extra)
-        return {'return': 0, 'run_args': run_args}
-
-
-    def docker(self, args):
+    def docker(self, run_args):
         self.action_type = "script"
         #logger.info(f"Running script with identifier: {args.details}")
         # The REPOS folder is set by the user, for example via an environment variable.
@@ -1131,27 +1067,19 @@ class ScriptAction(Action):
         module_path = os.path.join(script_path, "module.py")
         module = self.dynamic_import_module(module_path)
 
-        res = self.get_script_run_args(args)
-        if res['return'] > 0:
-            return res
-        run_args = res['run_args']
 
         # Check if ScriptAutomation is defined in the module
         if hasattr(module, 'ScriptAutomation'):
             automation_instance = module.ScriptAutomation(self, module_path)
-            #logger.info(f" script automation initialized at {module_path}")
-            #logger.info(run_args)
-            #return {'return': 1}
             result = automation_instance.docker(run_args)  # Pass args to the run method
-            #logger.info(result)
             if result['return'] > 0:
                 error = result.get('error', "")
                 raise ScriptExecutionError(f"Script docker execution failed. Error : {error}")
-            #logger.info(f"Script result: {result}")
             return result
         else:
             logger.info("ScriptAutomation class not found in the script.")
-    def run(self, args):
+
+    def run(self, run_args):
         self.action_type = "script"
         #logger.info(f"Running script with identifier: {args.details}")
         # The REPOS folder is set by the user, for example via an environment variable.
@@ -1163,10 +1091,6 @@ class ScriptAction(Action):
         module_path = os.path.join(script_path, "module.py")
         module = self.dynamic_import_module(module_path)
 
-        res = self.get_script_run_args(args)
-        if res['return'] > 0:
-            return res
-        run_args = res['run_args']
 
         # Check if ScriptAutomation is defined in the module
         if hasattr(module, 'ScriptAutomation'):
@@ -1203,26 +1127,11 @@ class CacheAction(Action):
         self.action_type = "cache"
         logger.info(f"Showing cache with identifier: {args.details}")
 
-    def find(self, args):
+    def find(self, run_args):
         #logger.info(f"Running script with identifier: {args.details}")
         # The REPOS folder is set by the user, for example via an environment variable.
         #logger.info(f"In cache action {repos_folder}")
 
-
-        if "tags" in args: # access function
-            tags = args["tags"]
-            cmd = args
-            run_args = args
-        else:
-            tags = ""
-            for option in args.extra:
-                opt = option.split("=")
-                if opt[0] == "--tags":
-                    tags = opt[1]
-            cmd = args.extra
-            
-            run_args = {'action': 'run', 'automation': 'cache', 'tags': tags, 'cmd': cmd, 'out': 'con',  'parsed_automation': [('cache', '541d6f712a6b464e')]}
-            #self.update_script_run_args(run_args, args.extra)
         run_args['target_name'] = "cache"
         #print(f"run_args = {run_args}")
         return self.search(run_args)
@@ -1281,8 +1190,6 @@ class CfgAction(Action):
         else:
             logger.info("Error: No configuration is currently loaded.")
 
-
-
 actions = {
         'repo': RepoAction,
         'script': ScriptAction,
@@ -1323,13 +1230,12 @@ def main():
     # The chosen subcommand will be stored in the "command" attribute of the parsed arguments.
     subparsers = parser.add_subparsers(dest='command', required=True)
 
-    # Pull parser - handles repo URLs directly
-    # The chosen subcommand will be stored in the "pull" attribute of the parsed arguments.
-    pull_parser = subparsers.add_parser('pull', help='Pull a repository by URL or target.')
-    pull_parser.add_argument('target_or_url', help='Target (repo) or URL for the repository.')
-
-    pull_parser.add_argument('details', nargs='?', help='Optional details or identifier.')
-    pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
+    for action in ['pull']:
+        # Pull parser - handles repo URLs directly
+        # The chosen subcommand will be stored in the "pull" attribute of the parsed arguments.
+        pull_parser = subparsers.add_parser('pull', help='Pull a repository by URL or target.')
+        pull_parser.add_argument('repo', help='Repo to pull in URL format or owner@repo_name format for github repos')
+        pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
     for action in ['run', 'show', 'update', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
@@ -1357,50 +1263,21 @@ def main():
 
     #logger.info(f"Args = {args}")
 
+    res = utils.convert_args_to_dictionary(args.extra)
+    if res['return'] > 0:
+        return res
+    run_args = res['args_dict']
 
-    # Parse extra options into a dictionary
-    options = {}
-    for opt in args.extra:
-        if opt.startswith('--'):
-            # Handle --key=value (long form)
-            if '=' in opt:
-                key, value = opt.lstrip('--').split('=')
-                options[key] = value
-            else:
-                options[opt.lstrip('--')] = True  # --key (flag without value)
-        elif opt.startswith('-'):
-            # Handle short options (-j or -xyz)
-            for char in opt.lstrip('-'):
-                options[char] = True
-        else:
-            logger.info(f"Warning: Unrecognized option '{opt}' ignored.")
-
-    if args.command == 'pull':
-        # If the first argument looks like a URL, assume repo pull
-        if args.target_or_url.startswith("http"):
-            action = RepoAction()
-            res = action.pull(args)
-            if res["return"] > 0:
-                logger.error(res.get('error', f"Error in repo action: {res['error']}"))
-        else:
-            action = get_action(args.target_or_url)
-            if action and hasattr(action, 'pull'):
-                res = action.pull(args)
-                if res["return"] > 0:
-                    logger.error(res.get('error', f"Error in repo action: {res['error']}"))
-            else:
-                logger.info(f"Error: '{args.target_or_url}' is not a valid target for pull.")
+    # Get the action handler for other commands
+    action = get_action(args.target)
+    # Dynamically call the method (e.g., run, list, show)
+    if action and hasattr(action, args.command):
+        method = getattr(action, args.command)
+        res = method(run_args)
+        if res['return'] > 0:
+            logger.error(res.get('error', f"Error in {action}"))
     else:
-        # Get the action handler for other commands
-        action = get_action(args.target)
-        # Dynamically call the method (e.g., run, list, show)
-        if action and hasattr(action, args.command):
-            method = getattr(action, args.command)
-            res = method(args)
-            if res['return'] > 0:
-                logger.error(res.get('error', f"Error in {action}"))
-        else:
-            logger.info(f"Error: '{args.command}' is not supported for {args.target}.")
+        logger.info(f"Error: '{args.command}' is not supported for {args.target}.")
 
 if __name__ == '__main__':
     main()
