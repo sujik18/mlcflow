@@ -969,6 +969,7 @@ class RepoAction(Action):
                 elif "already registered" in is_conflict["error"]:
                     #logger.warning(is_conflict["error"])
                     logger.info("No changes made to repos.json.")
+                    return {"return": 0}
                 else:
                     logger.warning(f"The repo to be cloned has conflict with the repo already in the path: {is_conflict['conflicting_path']}")
                     logger.warning(f"The repo currently being pulled will be registered in repos.json and already existing one would be unregistered.")
