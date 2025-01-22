@@ -1276,6 +1276,17 @@ def access(i):
     r = action_class.access(i)
     return r
 
+def mlcr():
+    first_arg_value = "run"
+    second_arg_value = "script"
+
+    # Insert the positional argument into sys.argv for the main function
+    sys.argv.insert(1, first_arg_value)
+    sys.argv.insert(2, second_arg_value)
+
+    # Call the main function
+    main()
+
 # Main CLI function
 def main():
     parser = argparse.ArgumentParser(prog='mlc', description='A CLI tool for managing repos, scripts, and caches.')
