@@ -13,10 +13,11 @@ import mlc.utils as utils
 from pathlib import Path
 import shutil
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 # Set up logging configuration
 def setup_logging(log_path = '.\mlc',log_file = 'mlc-log.txt'):
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    logger = logging.getLogger(__name__)
     
     logFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
