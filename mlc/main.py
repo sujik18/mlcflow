@@ -974,8 +974,8 @@ class RepoAction(Action):
         except Exception as e:
             logger.info(f"Error pulling repository: {str(e)}")
 
-    def pull(self, run_urgs):
-        repo_url = run_args['repo']#args.details if args.details else args.target_or_url
+    def pull(self, run_args):
+        repo_url = run_args.get('repo', 'repo')
         if repo_url == "repo":
             for repo_object in self.repos:
                 repo_folder_name = os.path.basename(repo_object.path)
@@ -1235,7 +1235,8 @@ def main():
         # Pull parser - handles repo URLs directly
         # The chosen subcommand will be stored in the "pull" attribute of the parsed arguments.
         pull_parser = subparsers.add_parser('pull', help='Pull a repository by URL or target.')
-        pull_parser.add_argument('repo', help='Repo to pull in URL format or owner@repo_name format for github repos')
+        pull_parser.add_argument('target', choices=['repo'], help='Target type (repo).')
+        pull_parser.add_argument('repo', nargs='?', help='Repo to pull in URL format or owner@repo_name format for github repos')
         pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
