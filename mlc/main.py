@@ -1268,7 +1268,7 @@ def main():
     if res['return'] > 0:
         return res
     run_args = res['args_dict']
-    if args.repo:
+    if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
 
     # Get the action handler for other commands
