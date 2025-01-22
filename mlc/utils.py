@@ -347,6 +347,48 @@ def save_txt(file_name, string):
     except Exception as e:
         return {'return': 1, 'error': str(e)}
 
+
+def convert_args_to_dictionary(inp):
+    args_dict = {}
+    for key in inp:
+        if "=" in key:
+            split = key.split("=", 1)  # Split only on the first "="
+            arg_key = split[0].strip("-")
+            arg_value = split[1]
+
+            # Handle lists: Only if "," is immediately before the "="
+            if "," in arg_key:
+                list_key, list_values = arg_key.rsplit(",", 1)
+                if not list_values:  # Ensure "=" follows the last comma
+                    args_dict[list_key] = arg_value.split(",")
+                    continue
+
+            # Handle dictionaries: `--adr.compiler.tags=gcc` becomes `{"adr": {"compiler": {"tags": "gcc"}}}`
+            elif "." in arg_key:
+                keys = arg_key.split(".")
+                current = args_dict
+                for part in keys[:-1]:
+                    if part not in current or not isinstance(current[part], dict):
+                        current[part] = {}
+                    current = current[part]
+                current[keys[-1]] = arg_value
+
+            # Handle simple key-value pairs
+            else:
+                args_dict[arg_key] = arg_value
+
+        # Handle flags: `--flag` becomes `{"flag": True}`
+        elif key.startswith("--"):
+            args_dict[key.strip("-")] = True
+
+        # Handle short options (-j or -xyz)
+        elif key.startswith("-"):
+            for char in key.lstrip('-'):
+                args_dict[char] = True
+
+    return {'return': 0, 'args_dict': args_dict}
+
+
 def sub_input(i, keys, reverse=False):
     """
     Extracts and returns values from the dictionary based on the provided keys.
