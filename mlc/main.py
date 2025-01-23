@@ -1186,7 +1186,7 @@ def get_action(target):
 
 def access(i):
     action = i['action']
-    target = i.get('target', i['automation'])
+    target = i.get('target', i.get('automation'))
     action_class = get_action(target)
     r = action_class.access(i)
     return r
