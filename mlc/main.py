@@ -572,9 +572,10 @@ class Action:
             else:
                 tags= i.get("tags")
                 tags_split = tags.split(",")
-                n_tags_ = [p for p in tags_split if p.startswith("-")]
+                non_variation_tags = [t for t in tags_split if not t.startswith("_")]
+                n_tags_ = [p for p in non_variation_tags if p.startswith("-")]
                 n_tags = [p[1:] for p in n_tags_]
-                p_tags = list(set(tags_split) - set(n_tags_))
+                p_tags = list(set(non_variation_tags) - set(n_tags_))
                 for res in target_index:
                     c_tags = res["tags"]
                     if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
