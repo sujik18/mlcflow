@@ -515,7 +515,7 @@ def convert_env_to_dict(env_text):
 
     return {'return': 0, 'dict': env_dict}
 
-def load_json(file_name):
+def load_json(file_name, encoding = None):
     """
     Load JSON data from a file and handle errors.
 
@@ -529,8 +529,12 @@ def load_json(file_name):
             - 'meta': The loaded JSON data if successful
     """
     try:
-        with open(file_name, 'r') as f:
-            meta = json.load(f)
+        if encoding:
+            with open(file_name, 'r', encoding=encoding) as f:
+                meta = json.load(f)
+        else:
+            with open(file_name, 'r') as f:
+                meta = json.load(f)
 
         return {'return': 0, 'meta': meta}
 

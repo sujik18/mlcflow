@@ -1049,12 +1049,9 @@ class ScriptAction(Action):
 
         return module
 
-    def docker(self, run_args):
+    def call_script_module_function(self, function_name, run_args):
         self.action_type = "script"
-        #logger.info(f"Running script with identifier: {args.details}")
-        # The REPOS folder is set by the user, for example via an environment variable.
         repos_folder = self.repos_path
-        #logger.info(f"In script action {repos_folder}")
 
         # Import script submodule 
         script_path = self.find_target_folder("script")
@@ -1065,7 +1062,15 @@ class ScriptAction(Action):
         # Check if ScriptAutomation is defined in the module
         if hasattr(module, 'ScriptAutomation'):
             automation_instance = module.ScriptAutomation(self, module_path)
-            result = automation_instance.docker(run_args)  # Pass args to the run method
+            if function_name == "run":
+                result = automation_instance.run(run_args)  # Pass args to the run method
+            elif function_name == "docker":
+                result = automation_instance.docker(run_args)  # Pass args to the run method
+            elif function_name == "test":
+                result = automation_instance.test(run_args)  # Pass args to the run method
+            else:
+                return {'return': 1, 'error': f'Function {function_name} is not supported'}
+            
             if result['return'] > 0:
                 error = result.get('error', "")
                 raise ScriptExecutionError(f"Script docker execution failed. Error : {error}")
@@ -1073,33 +1078,15 @@ class ScriptAction(Action):
         else:
             logger.info("ScriptAutomation class not found in the script.")
 
+    def docker(self, run_args):
+        return self.call_script_module_function("docker", run_args)
+
     def run(self, run_args):
-        self.action_type = "script"
-        # The REPOS folder is set by the user, for example via an environment variable.
-        repos_folder = self.repos_path
-        #logger.info(f"In script action {repos_folder}")
+        return self.call_script_module_function("run", run_args)
 
-        # Import script submodule 
-        script_path = self.find_target_folder("script")
-        module_path = os.path.join(script_path, "module.py")
-        module = self.dynamic_import_module(module_path)
+    def test(self, run_args):
+        return self.call_script_module_function("test", run_args)
 
-
-        # Check if ScriptAutomation is defined in the module
-        if hasattr(module, 'ScriptAutomation'):
-            automation_instance = module.ScriptAutomation(self, module_path)
-            #logger.info(f" script automation initialized at {module_path}")
-            #logger.info(run_args)
-            #return {'return': 1}
-            result = automation_instance.run(run_args)  # Pass args to the run method
-            #logger.info(result)
-            if result['return'] > 0:
-                error = result.get('error', "")
-                raise ScriptExecutionError(f"Script execution failed. Error : {error}")
-            #logger.info(f"Script result: {result}")
-            return result
-        else:
-            logger.info("ScriptAutomation class not found in the script.")
 
     def list(self, args):
         logger.info("Listing all scripts.")
@@ -1232,7 +1219,7 @@ def main():
         pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
-    for action in ['run', 'show', 'update', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
+    for action in ['run', 'test', 'show', 'update', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
