@@ -64,7 +64,6 @@ class Action:
             return {'return': 1, 'error': "'action' key is required in options"}
         #logger.info(f"options = {options}")
 
-        #print(f"options = {options}")
         action_target = options.get('target')
         if not action_target:
             action_target = options.get('automation', 'script')  # Default to script if not provided
@@ -79,7 +78,6 @@ class Action:
             if hasattr(action, action_name):
                 # Find the method and call it with the options
                 method = getattr(action, action_name)
-                #print(f"method = {method}, action = {action}, action_name  = {action_name}")
                 result = method(self, options)
                 #logger.info(f"result ={result}")
                 return result
@@ -162,7 +160,6 @@ class Action:
             # Create a Repo object and add it to the list
             repos_list.append(Repo(path=repo_path, meta=meta))
 
-        #print(repos_list)
         return repos_list
 
     def load_repos(self):
@@ -192,7 +189,6 @@ class Action:
             if repo_object.meta.get('uid', '') == '':
                 return {"return": 1, "error": f"UID is not present in file 'meta.yaml' in the repo path {repo_object.path}"}
             if repo_meta["uid"] == repo_object.meta.get('uid', ''):
-                #print(f"{repo_meta['path']} {repo_object.path}")
                 if repo_meta['path'] == repo_object.path:
                     return {"return": 1, "error": f"Same repo is already registered"}
                 else:
@@ -300,8 +296,6 @@ class Action:
         # Parse item details
         item = i.get("item")
         item_name, item_id = (None, None)
-        #print(f"i = {i}")
-        #return {'return': 1}
         if item:
             item_parts = item.split(",")
             item_name = item_parts[0]
@@ -443,16 +437,11 @@ class Action:
                 current_tags = set(meta.get("tags", []))
                 updated_tags = current_tags.union(new_tags)
                 meta["tags"] = list(updated_tags)
-            #print(f"meta = {meta}")
             utils.merge_dicts({"dict1": meta, "dict2": new_meta, "append_lists": True, "append_unique":True})
         
             # Save the updated meta back to the item
             item.meta = meta
-            #print(f"item.meta = {item.meta}, saved_meta = {saved_meta}")
             save_result = utils.save_json(item_meta_path, meta=meta)
-            #print(f"item_meta = {item.meta}, path = {item.path}")
-            #print(item.repo_path)
-            #return {'return': 1}
             self.index.update(meta, target_name, item.path, item.repo)
 
         return {'return': 0, 'message': f"Tags updated successfully for {len(found_items)} item(s).", 'list': found_items }
@@ -515,7 +504,6 @@ class Action:
             target_item_name = target_split[0]
 
         target_item_path = os.path.join(target_repo_path, action_target, target_item)
-        #print(f"src_path = {src_item_path}, target_item = {target_item_name}, target_item_path = {target_item_path}, target_repo = {target_repo}")
         res = self.copy_item(src_item_path, target_item_path)
         if res['return'] > 0:
             return res
@@ -562,7 +550,6 @@ class Action:
 
     def search(self, i):
         indices = self.index.indices
-        #print(f"search input = {i}")
         target = i.get('target_name', self.action_type)
         target_index = indices.get(target)
         result = []
@@ -593,7 +580,6 @@ class Action:
                     if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
                         it = Item(res['path'], res['repo'])
                         result.append(it)
-        #print(f"Search result for target {target} = {result}")
         return {'return': 0, 'list': result}
 
 
@@ -670,7 +656,6 @@ class Index:
             # Filter for relevant directories in the repo
             for folder_type in ["script", "cache", "experiment"]:
                 folder_path = os.path.join(repo_path, folder_type)
-                #print(f"folder_path = {folder_path}")
                 if not os.path.isdir(folder_path):
                     continue
 
@@ -1055,6 +1040,9 @@ class ScriptAction(Action):
 
         # Import script submodule 
         script_path = self.find_target_folder("script")
+        if not script_path:
+            return {'return': 1, 'error': f"""Script automation not found. Have you done "mlc pull repo mlcommons@mlperf-automations --branch=dev"?"""}
+
         module_path = os.path.join(script_path, "module.py")
         module = self.dynamic_import_module(module_path)
 
@@ -1113,7 +1101,6 @@ class CacheAction(Action):
         #logger.info(f"In cache action {repos_folder}")
 
         run_args['target_name'] = "cache"
-        #print(f"run_args = {run_args}")
         return self.search(run_args)
 
     def list(self, args):
@@ -1252,6 +1239,10 @@ def main():
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
 
+    if args.command in ["pull"]:
+        if run_args.get('url') and not run_args.get('repo'):
+            run_args['repo'] = run_args['url']
+
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
         if hasattr(args, 'details') and args.details:
@@ -1273,4 +1264,4 @@ def main():
 if __name__ == '__main__':
     main()
 
-__version__ = "0.0.1"
+#__version__ = "0.0.1"
