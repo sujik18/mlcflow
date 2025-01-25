@@ -38,7 +38,7 @@ jobs:
 
     - name: Test 1 - pull repo - Pull a forked MLOps repository
       env:
-        GH_MLC_REPO_NAME_FORK: "${HOME}/MLC/repos/anandhu-eng@mlperf-automations"
+        GH_MLC_REPO_PATH_FORK: "${HOME}/MLC/repos/anandhu-eng@mlperf-automations"
         GH_MLC_REPO_JSON_PATH: "${HOME}/MLC/repos/repos.json"
       run: |
         mlc pull repo anandhu-eng@mlperf-automations  --checkout=dev
