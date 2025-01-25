@@ -32,9 +32,9 @@ jobs:
 
     - name: Install mlcflow from the pull request's source repository and branch
       run: |
-        git clone ${{ github.event.pull_request.head.repo.html_url }} --branch=${{ github.event.pull_request.head.ref }}
-        cd mlcflow
-        pip install .
+        python -m pip install --upgrade pip
+        python -m pip install --ignore-installed --verbose pip setuptools
+        python -m pip install .
 
     - name: Test pull repo - Pull a forked MLOps repository
       run: |
