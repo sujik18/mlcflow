@@ -33,11 +33,11 @@ jobs:
     - name: Test pull repo - Pull MLOps repository
       run: |
         pip install mlcflow
-        mlc pull repo anandhu-eng@mlperf-automations
+        mlc pull repo anandhu-eng@mlperf-automations  --checkout=dev
       
     - name: Test pull repo - Test conflicting repo scenario
       run: |
-        mlc pull repo mlcommons@mlperf-automations
+        mlc pull repo mlcommons@mlperf-automations --checkout=dev
     
     - name: Test list repo - List the existing repositories
       run: |
