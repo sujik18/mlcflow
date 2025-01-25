@@ -1266,6 +1266,10 @@ def main():
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
 
+    if args.command in ['rm']:
+        if args.target == "repo":
+            run_args['repo'] = args.details
+
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
         if hasattr(args, 'details') and args.details:
