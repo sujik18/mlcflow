@@ -17,6 +17,9 @@ jobs:
       matrix:
         python-version: ["3.12", "3.8"]
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        exclude:
+          - os: windows-latest
+          - os: macos-latest
 
     steps:
     - uses: actions/checkout@v4
@@ -42,7 +45,7 @@ jobs:
         GH_MLC_REPO_JSON_PATH: "${HOME}/MLC/repos/repos.json"
       run: |
         mlc pull repo anandhu-eng@mlperf-automations  --checkout=dev
-        if [ ! -d "$GH_MLC_REPO_PATH_FORK" ]; then
+        if [ ! -d "${GH_MLC_REPO_PATH_FORK}" ]; then
           echo "Repository folder $GH_MLC_REPO_PATH_FORK not found. Exiting with failure."
           exit 1
         fi
