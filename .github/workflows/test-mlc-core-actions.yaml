@@ -36,41 +36,29 @@ jobs:
         python -m pip install --ignore-installed --verbose pip setuptools
         python -m pip install .
 
-    - name: Define helper functions
-      shell: bash
-      run: |
-        # Function to validate a repository after pulling
-        validate_repo() {
-          local repo_path="$1"
-          local repo_json_path="$2"
-          local expected_branch="$3"
-
-          if [ ! -d "$repo_path" ]; then
-            echo "Repository folder $repo_path not found. Exiting with failure."
-            exit 1
-          fi
-          if [ ! -f "$repo_json_path" ]; then
-            echo "File $repo_json_path does not exist. Exiting with failure."
-            exit 1
-          fi
-          if ! grep -q "$repo_path" "$repo_json_path"; then
-            echo "Path $repo_path not found in $repo_json_path. Exiting with failure."
-            exit 1
-          fi
-          CURRENT_BRANCH=$(git -C "$repo_path" rev-parse --abbrev-ref HEAD)
-          if [ "$CURRENT_BRANCH" != "$expected_branch" ]; then
-            echo "Expected branch '$expected_branch', but found '$CURRENT_BRANCH'. Exiting with failure."
-            exit 1
-          fi
-        }
-
     - name: Test 1 - pull repo - Pull a forked MLOps repository
       env:
         GH_MLC_REPO_PATH_FORK: "$HOME/MLC/repos/anandhu-eng@mlperf-automations"
         GH_MLC_REPO_JSON_PATH: "$HOME/MLC/repos/repos.json"
       run: |
         mlc pull repo anandhu-eng@mlperf-automations  --checkout=dev
-        validate_repo "$GH_MLC_REPO_PATH_FORK" "$GH_MLC_REPO_JSON_PATH" "dev"
+        if [ ! -d "$GH_MLC_REPO_PATH_FORK" ]; then
+          echo "Repository folder $GH_MLC_REPO_PATH_FORK not found. Exiting with failure."
+          exit 1
+        fi
+        if [ ! -f "$GH_MLC_REPO_JSON_PATH" ]; then
+          echo "File $GH_MLC_REPO_JSON_PATH does not exist. Exiting with failure."
+          exit 1
+        fi
+        if ! grep -q "$GH_MLC_REPO_PATH_FORK" "$GH_MLC_REPO_JSON_PATH"; then
+          echo "Path $GH_MLC_REPO_PATH_FORK not found in $GH_MLC_REPO_JSON_PATH. Exiting with failure."
+          exit 1
+        fi
+        CURRENT_BRANCH=$(git -C "$GH_MLC_REPO_PATH_FORK" rev-parse --abbrev-ref HEAD)
+        if [ "$CURRENT_BRANCH" != "dev" ]; then
+          echo "Expected branch 'dev', but found '$CURRENT_BRANCH'. Exiting with failure."
+          exit 1
+        fi
 
       
     - name: Test 2 - pull repo - Test conflicting repo scenario
@@ -79,9 +67,25 @@ jobs:
         GH_MLC_REPO_JSON_PATH: "$HOME/MLC/repos/repos.json"
       run: |
         mlc pull repo mlcommons@mlperf-automations --checkout=dev
-        validate_repo "$GH_MLC_REPO_PATH" "$GH_MLC_REPO_JSON_PATH" "dev"
-        if grep -q "$GH_MLC_REPO_PATH_FORK" "$GH_MLC_REPO_JSON_PATH"; then
+        if [ ! -d "$GH_MLC_REPO_PATH" ]; then
+          echo "Repository folder $GH_MLC_REPO_PATH not found. Exiting with failure."
+          exit 1
+        fi
+        if [ ! -f "$GH_MLC_REPO_JSON_PATH" ]; then
+          echo "File $GH_MLC_REPO_JSON_PATH does not exist. Exiting with failure."
+          exit 1
+        fi
+        if ! grep -q "$GH_MLC_REPO_PATH" "$GH_MLC_REPO_JSON_PATH"; then
+          echo "Path $GH_MLC_REPO_PATH not found in $GH_MLC_REPO_JSON_PATH. Exiting with failure."
+          exit 1
+        fi
+        if ! grep -q "$GH_MLC_REPO_PATH_FORK" "$GH_MLC_REPO_JSON_PATH"; then
           echo "Path $GH_MLC_REPO_PATH_FORK also found in $GH_MLC_REPO_JSON_PATH. This should have been replaced. Exiting with failure."
+          exit 1
+        fi
+        CURRENT_BRANCH=$(git -C "$GH_MLC_REPO_PATH" rev-parse --abbrev-ref HEAD)
+        if [ "$CURRENT_BRANCH" != "dev" ]; then
+          echo "Expected branch 'dev', but found '$CURRENT_BRANCH'. Exiting with failure."
           exit 1
         fi
     
