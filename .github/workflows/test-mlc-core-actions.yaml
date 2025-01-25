@@ -30,9 +30,14 @@ jobs:
       run: |
         git config --system core.longpaths true
 
-    - name: Test pull repo - Pull MLOps repository
+    - name: Install mlcflow from the pull request's source repository and branch
       run: |
-        pip install mlcflow
+        git clone ${{ github.event.pull_request.head.repo.html_url }} --branch=${{ github.event.pull_request.head.ref }}
+        cd mlcflow
+        pip install .
+
+    - name: Test pull repo - Pull a forked MLOps repository
+      run: |
         mlc pull repo anandhu-eng@mlperf-automations  --checkout=dev
       
     - name: Test pull repo - Test conflicting repo scenario
@@ -42,6 +47,10 @@ jobs:
     - name: Test list repo - List the existing repositories
       run: |
         mlc list repo
+
+    - name: Test rm repo - Remove the forked mlperf-automation repo
+      run: |
+        mlc rm repo anandhu-eng@mlperf-automations
 
     - name: Test find cache - Cache not present
       run: |
