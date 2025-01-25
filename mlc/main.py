@@ -572,10 +572,16 @@ class Action:
             else:
                 tags= i.get("tags")
                 tags_split = tags.split(",")
-                non_variation_tags = [t for t in tags_split if not t.startswith("_")]
-                n_tags_ = [p for p in non_variation_tags if p.startswith("-")]
+                if target == "script":
+                    non_variation_tags = [t for t in tags_split if not t.startswith("_")]
+                    tags_to_match = non_variation_tags
+                elif target =="cache":
+                    tags_to_match = tags_split
+                else:
+                    return {'return': 1, 'error': f"""Target {target} not handled in mlc yet"""}
+                n_tags_ = [p for p in tags_to_match if p.startswith("-")]
                 n_tags = [p[1:] for p in n_tags_]
-                p_tags = list(set(non_variation_tags) - set(n_tags_))
+                p_tags = list(set(tags_to_match) - set(n_tags_))
                 for res in target_index:
                     c_tags = res["tags"]
                     if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
@@ -1092,9 +1098,11 @@ class CacheAction(Action):
         logger.debug(f"Searching for cache with input: {i}")
         return super().search(i)
 
-    def show(self, args):
+    def show(self, run_args):
         self.action_type = "cache"
         logger.info(f"Showing cache with identifier: {args.details}")
+        run_args['target_name'] = "cache"
+        return self.search(run_args)
 
     def find(self, run_args):
         #logger.info(f"Running script with identifier: {args.details}")
