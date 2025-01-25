@@ -40,10 +40,9 @@ jobs:
         python -m pip install .
 
     - name: Test 1 - pull repo - Pull a forked MLOps repository
-      env:
-        GH_MLC_REPO_PATH_FORK: "${HOME}/MLC/repos/anandhu-eng@mlperf-automations"
-        GH_MLC_REPO_JSON_PATH: "${HOME}/MLC/repos/repos.json"
       run: |
+        GH_MLC_REPO_PATH_FORK="${HOME}/MLC/repos/anandhu-eng@mlperf-automations"
+        GH_MLC_REPO_JSON_PATH="${HOME}/MLC/repos/repos.json"
         mlc pull repo anandhu-eng@mlperf-automations  --checkout=dev
         if [ ! -d "${GH_MLC_REPO_PATH_FORK}" ]; then
           echo "Repository folder $GH_MLC_REPO_PATH_FORK not found. Exiting with failure."
@@ -65,10 +64,9 @@ jobs:
 
       
     - name: Test 2 - pull repo - Test conflicting repo scenario
-      env:
-        GH_MLC_REPO_PATH: "${HOME}/MLC/repos/mlcommons@mlperf-automations"
-        GH_MLC_REPO_JSON_PATH: "${HOME}/MLC/repos/repos.json"
       run: |
+        GH_MLC_REPO_PATH="${HOME}/MLC/repos/mlcommons@mlperf-automations"
+        GH_MLC_REPO_JSON_PATH="${HOME}/MLC/repos/repos.json"
         mlc pull repo mlcommons@mlperf-automations --checkout=dev
         if [ ! -d "$GH_MLC_REPO_PATH" ]; then
           echo "Repository folder $GH_MLC_REPO_PATH not found. Exiting with failure."
@@ -97,10 +95,8 @@ jobs:
         mlc list repo
 
     - name: Test  4 - rm repo - Remove the forked mlperf-automation repo
-      env:
-        GH_MLC_REPO_PATH_FORK: "${HOME}/MLC/repos/anandhu-eng@mlperf-automations"
-        GH_MLC_REPO_JSON_PATH: "${HOME}/MLC/repos/repos.json"
       run: |
+        GH_MLC_REPO_PATH_FORK="${HOME}/MLC/repos/anandhu-eng@mlperf-automations"
         mlc rm repo anandhu-eng@mlperf-automations
         if [ -d "$GH_MLC_REPO_PATH_FORK" ]; then
           echo "Repository folder $GH_MLC_REPO_PATH found. It should ideally be deleted. Exiting with failure."
