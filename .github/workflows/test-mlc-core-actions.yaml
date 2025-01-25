@@ -1,0 +1,57 @@
+name: MLC core actions test
+
+on:
+  pull_request:
+    branches: [ "main", "dev" ]
+    paths:
+      - '.github/workflows/test-mlc-core-actions.yml'
+      - '**'
+      - '!**.md'
+
+jobs:
+  test_mlc_core_actions:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.8"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Configure git longpaths (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        git config --system core.longpaths true
+
+    - name: Test pull repo - Pull MLOps repository
+      run: |
+        pip install mlcflow
+        mlc pull repo anandhu-eng@mlperf-automations
+      
+    - name: Test pull repo - Test conflicting repo scenario
+      run: |
+        mlc pull repo mlcommons@mlperf-automations
+    
+    - name: Test list repo - List the existing repositories
+      run: |
+        mlc list repo
+
+    - name: Test find cache - Cache not present
+      run: |
+        mlc find cache --tags=detect,os
+
+    - name: Test run script - Output being used for testing mlc cache
+      run: |
+        mlc run script --tags=get,imagenet-aux
+        mlc run script --tags=get,imagenet-aux,_from.dropbox
+
+    - name: Test find cache - More than one cache present
+      run: |
+        mlc find cache --tags=get,imagenet-aux
