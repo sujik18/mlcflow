@@ -1077,6 +1077,7 @@ class ScriptAction(Action):
             return result
         else:
             logger.info("ScriptAutomation class not found in the script.")
+            return {'return': 1, 'error': 'ScriptAutomation class not found in the script.'}
 
     def docker(self, run_args):
         return self.call_script_module_function("docker", run_args)
@@ -1111,10 +1112,23 @@ class CacheAction(Action):
         #logger.info(f"Running script with identifier: {args.details}")
         # The REPOS folder is set by the user, for example via an environment variable.
         #logger.info(f"In cache action {repos_folder}")
-
         run_args['target_name'] = "cache"
         #print(f"run_args = {run_args}")
-        return self.search(run_args)
+        res = self.search(run_args)
+        if res['return'] > 0:
+            return res
+        else:
+            if not res['list']:
+                logger.warning("No cache entry found for the specified tags!")
+                return {'return': 0, 'list': []}
+            else:
+                logger.info("Listing all cache entries found for the specified tags.")
+                print("Cache entries:")
+                print("-------------")
+                for cache_entry in res['list']:
+                    print(f"- {cache_entry.path}\n")
+                print("-------------")
+                return {"return": 0, 'list': res['list']}
 
     def list(self, args):
         logger.info("Listing all caches.")
