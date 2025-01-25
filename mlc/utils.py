@@ -6,10 +6,10 @@ import importlib.util
 import platform
 import json
 import yaml
-
-import os
 import uuid
 import shutil
+import tarfile
+import zipfile
 
 def generate_temp_file(i):
     """
@@ -88,7 +88,8 @@ def load_txt(file_name, check_if_exists=False, split=False, match_text=None, fai
         
         result = {'return': 0}
         if split:
-            result['string'] = content.splitlines()
+            result['list'] = content.splitlines()
+            result['string'] = content
         else:
             result['string'] = content
         
@@ -100,40 +101,83 @@ def load_txt(file_name, check_if_exists=False, split=False, match_text=None, fai
     except Exception as e:
         return {'return': 1, 'error': str(e)}
 
-'''
-def load_txt(file_name, remove_after_read=False, check_if_exists=True):
+def compare_versions(current_version, min_version):
     """
-    Loads the content of a text file into a string, with the option to delete the file after reading.
+    Compare two semantic version strings.
 
     Args:
-        file_name (str): The path to the text file to read.
-        remove_after_read (bool): If True, the file will be removed after reading.
+        current_version (str): The current version string (e.g., "1.2.3").
+        min_version (str): The minimum required version string (e.g., "1.0.0").
 
     Returns:
-        dict: A dictionary containing:
-            - return (int): Return code, 0 if no error, >0 if error
-            - error (str): Error string if return > 0
-            - string (str): The content of the file, or an empty string if there is an error.
+        int: -1 if current_version < min_version,
+             0 if current_version == min_version,
+             1 if current_version > min_version.
     """
     try:
-        # Check if the file exists
-        if not os.path.isfile(file_name):
-            return {'return': 1, 'error': f"File {file_name} not found", 'string': ''}
+        # Use `packaging.version` to handle semantic version comparison
+        current = version.parse(current_version)
+        minimum = version.parse(min_version)
 
-        # Read the content of the file
-        with open(file_name, 'r') as file:
-            file_content = file.read()
-
-        # Optionally remove the file after reading
-        if remove_after_read:
-            os.remove(file_name)
-
-        # Return the content in the expected dictionary format
-        return {'return': 0, 'error': '', 'string': file_content}
-
+        if current < minimum:
+            return -1
+        elif current > minimum:
+            return 1
+        else:
+            return 0
     except Exception as e:
-        return {'return': 1, 'error': str(e), 'string': ''}
-'''
+        raise ValueError(f"Invalid version format: {e}")
+
+def run_system_cmd(i):
+    """
+    Execute a system command in a specified path.
+
+    Args:
+        i (dict): A dictionary containing:
+            - 'path' (str): The directory to run the command in.
+            - 'cmd' (str): The system command to execute.
+
+    Returns:
+        dict: A dictionary with the result of the execution:
+            - {'return': 0, 'output': <command_output>} on success.
+            - {'return': 1, 'error': <error_message>} on failure.
+    """
+    # Extract path and cmd from the input dictionary
+    path = i.get('path', '.')
+    cmd = i.get('cmd', '')
+
+    if not cmd:
+        return {'return': 1, 'error': 'No command provided to execute.'}
+
+    if not os.path.exists(path):
+        return {'return': 1, 'error': f"Specified path does not exist: '{path}'"}
+
+    # Change to the specified path and execute the command
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=path,
+            shell=True,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        return {
+            'return': 0,
+            'output': result.stdout.strip(),
+            'error_output': result.stderr.strip()
+        }
+    except subprocess.CalledProcessError as e:
+        return {
+            'return': 1,
+            'error': f"Command execution failed with error code {e.returncode}.",
+            'error_output': e.stderr.strip()
+        }
+    except Exception as e:
+        return {'return': 1, 'error': f"Unexpected error occurred: {str(e)}"}
+
+
 def print_env(env):
     print_formatted_json(env)
 
@@ -209,8 +253,22 @@ def merge_dicts(params, in_place=True):
             elif isinstance(existing_value, list) and isinstance(value, list):
                 if append_lists:
                     if append_unique:
-                        # Append only unique values from the second list
-                        merged_dict[key] = list(set(existing_value + value))
+                        # Combine dictionaries uniquely based on their key-value pairs
+                        seen = set()
+                        merged_list = []
+                        for item in existing_value + value:
+                            if isinstance(item, dict):
+                                try:
+                                    item_frozenset = frozenset(item.items())
+                                except TypeError:
+                                    item_frozenset = id(item)
+                            else:
+                                item_frozenset = item
+                            if item_frozenset not in seen:
+                                seen.add(item_frozenset)
+                                merged_list.append(item)
+                        merged_dict[key] = merged_list
+                    
                     else:
                         # Simply append the values
                         merged_dict[key] = existing_value + value
@@ -248,6 +306,27 @@ def save_json(file_name, meta):
     except Exception as e:
         return {'return': 1, 'error': str(e)}
 
+
+def save_yaml(file_name, meta):
+    """
+    Saves the provided meta data to a YAML file.
+
+    Args:
+        file_name (str): The name of the file where the YAML data will be saved.
+        meta (dict): The dictionary containing the data to be saved in YAML format.
+
+    Returns:
+        dict: A dictionary indicating success or failure of the operation.
+            - 'return' (int): 0 if the operation was successful, > 0 if an error occurred.
+            - 'error' (str): Error message, if any error occurred.
+    """
+    try:
+        with open(file_name, 'w') as f:
+            yaml.dump(meta, f, default_flow_style=False, sort_keys=False)
+        return {'return': 0, 'error': ''}
+    except Exception as e:
+        return {'return': 1, 'error': str(e)}
+
 def save_txt(file_name, string):
     """
     Saves the provided string to a text file.
@@ -267,6 +346,48 @@ def save_txt(file_name, string):
         return {'return': 0, 'error': ''}
     except Exception as e:
         return {'return': 1, 'error': str(e)}
+
+
+def convert_args_to_dictionary(inp):
+    args_dict = {}
+    for key in inp:
+        if "=" in key:
+            split = key.split("=", 1)  # Split only on the first "="
+            arg_key = split[0].strip("-")
+            arg_value = split[1]
+
+            # Handle lists: Only if "," is immediately before the "="
+            if "," in arg_key:
+                list_key, list_values = arg_key.rsplit(",", 1)
+                if not list_values:  # Ensure "=" follows the last comma
+                    args_dict[list_key] = arg_value.split(",")
+                    continue
+
+            # Handle dictionaries: `--adr.compiler.tags=gcc` becomes `{"adr": {"compiler": {"tags": "gcc"}}}`
+            elif "." in arg_key:
+                keys = arg_key.split(".")
+                current = args_dict
+                for part in keys[:-1]:
+                    if part not in current or not isinstance(current[part], dict):
+                        current[part] = {}
+                    current = current[part]
+                current[keys[-1]] = arg_value
+
+            # Handle simple key-value pairs
+            else:
+                args_dict[arg_key] = arg_value
+
+        # Handle flags: `--flag` becomes `{"flag": True}`
+        elif key.startswith("--"):
+            args_dict[key.strip("-")] = True
+
+        # Handle short options (-j or -xyz)
+        elif key.startswith("-"):
+            for char in key.lstrip('-'):
+                args_dict[char] = True
+
+    return {'return': 0, 'args_dict': args_dict}
+
 
 def sub_input(i, keys, reverse=False):
     """
@@ -394,7 +515,7 @@ def convert_env_to_dict(env_text):
 
     return {'return': 0, 'dict': env_dict}
 
-def load_json(file_name):
+def load_json(file_name, encoding = None):
     """
     Load JSON data from a file and handle errors.
 
@@ -408,8 +529,12 @@ def load_json(file_name):
             - 'meta': The loaded JSON data if successful
     """
     try:
-        with open(file_name, 'r') as f:
-            meta = json.load(f)
+        if encoding:
+            with open(file_name, 'r', encoding=encoding) as f:
+                meta = json.load(f)
+        else:
+            with open(file_name, 'r') as f:
+                meta = json.load(f)
 
         return {'return': 0, 'meta': meta}
 
@@ -455,3 +580,58 @@ def convert_tags_to_list(tags_string):
     tags_list = [tag.strip() for tag in tags_string.split(',') if tag.strip()]
 
     return {'return': 0, 'tags': tags_list}
+
+
+
+def extract_file(options):
+    """
+    Extracts a compressed file, optionally stripping folder levels.
+
+    Args:
+        options (dict): A dictionary with the following keys:
+            - 'filename' (str): The path to the compressed file to extract.
+            - 'strip_folders' (int, optional): The number of folder levels to strip. Default is 0.
+
+    Raises:
+        ValueError: If the file format is unsupported.
+        FileNotFoundError: If the specified file does not exist.
+    """
+    filename = options.get('filename')
+    strip_folders = options.get('strip_folders', 0)
+
+    if not filename or not os.path.exists(filename):
+        raise FileNotFoundError(f"File not found: {filename}")
+
+    extract_to = os.path.join(os.path.dirname(filename), "extracted")
+    os.makedirs(extract_to, exist_ok=True)
+
+    # Check file type and extract accordingly
+    if zipfile.is_zipfile(filename):
+        with zipfile.ZipFile(filename, 'r') as archive:
+            members = archive.namelist()
+            for member in members:
+                # Strip folder levels
+                stripped_path = os.path.join(
+                    extract_to, *member.split(os.sep)[strip_folders:]
+                )
+                if member.endswith('/'):  # Directory
+                    os.makedirs(stripped_path, exist_ok=True)
+                else:  # File
+                    os.makedirs(os.path.dirname(stripped_path), exist_ok=True)
+                    with archive.open(member) as source, open(stripped_path, 'wb') as target:
+                        shutil.copyfileobj(source, target)
+
+    elif tarfile.is_tarfile(filename):
+        with tarfile.open(filename, 'r') as archive:
+            members = archive.getmembers()
+            for member in members:
+                if strip_folders:
+                    parts = member.name.split('/')
+                    member.name = '/'.join(parts[strip_folders:])
+                archive.extract(member, path=extract_to)
+
+    else:
+        raise ValueError(f"Unsupported file format: {filename}")
+
+    print(f"Extraction complete. Files extracted to: {extract_to}")
+

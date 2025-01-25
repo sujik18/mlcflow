@@ -1,0 +1,48 @@
+name: MLPerf inference bert (deepsparse, tf, onnxruntime, pytorch)
+
+on:
+  pull_request:
+    branches: [ "main", "dev" ]
+    paths:
+      - '.github/workflows/test-mlperf-inference-bert-deepsparse-tf-onnxruntime-pytorch.yml'
+      - '**'
+      - '!**.md'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 didn't work on 20240305 - need to check
+        python-version: [ "3.11" ]
+        backend: [ "deepsparse", "tf", "onnxruntime", "pytorch" ]
+        precision: [ "int8", "fp32" ]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        exclude:
+          - backend: tf
+          - backend: pytorch
+          - backend: onnxruntime
+          - precision: fp32
+          - os: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install mlcflow
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --ignore-installed --verbose pip setuptools
+        python -m pip install .
+        mlc pull repo mlcommons@mlperf-automations --branch=dev
+    - name: Test MLPerf Inference Bert ${{ matrix.backend }} on ${{ matrix.os }}
+      if: matrix.os == 'windows-latest'
+      run: |
+        mlcr --tags=run,mlperf,inference,generate-run-cmds,_submission,_short --submitter="MLCommons" --hw_name=gh_${{ matrix.os }} --model=bert-99 --backend=${{ matrix.backend }} --device=cpu --scenario=Offline --test_query_count=5 --adr.loadgen.tags=_from-pip --pip_loadgen=yes --precision=${{ matrix.precision }} --target_qps=1 -v --quiet
+    - name: Test MLPerf Inference Bert ${{ matrix.backend }} on ${{ matrix.os }}
+      if: matrix.os != 'windows-latest'
+      run: |
+        mlcr --tags=run,mlperf,inference,generate-run-cmds,_submission,_short --submitter="MLCommons" --hw_name=gh_${{ matrix.os }}_x86 --model=bert-99 --backend=${{ matrix.backend }} --device=cpu --scenario=Offline --test_query_count=5 --precision=${{ matrix.precision }} --target_qps=1 -v --quiet
