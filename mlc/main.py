@@ -960,7 +960,7 @@ class RepoAction(Action):
             return {'return': 1, 'error': f"Error pulling repository: {str(e)}"}
 
     def pull(self, run_args):
-        repo_url = run_args.get('repo', 'repo')
+        repo_url = run_args.get('repo', run_args.get('url', 'repo'))
         if repo_url == "repo":
             for repo_object in self.repos:
                 repo_folder_name = os.path.basename(repo_object.path)
@@ -1247,10 +1247,6 @@ def main():
     run_args = res['args_dict']
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
-
-    if args.command in ["pull"]:
-        if run_args.get('url') and not run_args.get('repo'):
-            run_args['repo'] = run_args['url']
 
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
