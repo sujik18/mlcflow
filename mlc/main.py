@@ -1155,8 +1155,6 @@ class ScriptAction(Action):
 
         return module
 
-    find = search
-
     def call_script_module_function(self, function_name, run_args):
         self.action_type = "script"
         repos_folder = self.repos_path
@@ -1224,8 +1222,6 @@ class CacheAction(Action):
         logger.info(f"Showing cache with identifier: {args.details}")
         run_args['target_name'] = "cache"
         return self.search(run_args)
-
-    find = search
 
     def list(self, args):
         logger.info("Listing all caches.")
