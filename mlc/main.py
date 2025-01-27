@@ -11,10 +11,44 @@ import logging
 from types import SimpleNamespace
 import mlc.utils as utils
 from pathlib import Path
+from colorama import Fore, Style, init
 import shutil
+# Initialize colorama for Windows support
+init(autoreset=True)
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter class to add colors to log levels"""
+    COLORS = {
+        'INFO': Fore.GREEN,
+        'WARNING': Fore.YELLOW,
+        'ERROR': Fore.RED
+    }
+
+    def format(self, record):
+        # Add color to the levelname
+        if record.levelname in self.COLORS:
+            record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
+        return super().format(record)
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Create console handler with the custom formatter
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+# Remove any existing handlers and add our custom handler
+if logger.hasHandlers():
+    logger.handlers.clear()
+
+logger.addHandler(console_handler)
+
+# # Set up logging configuration
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# logger = logging.getLogger(__name__)
+
 
 # Set up logging configuration
 def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
@@ -113,13 +147,13 @@ class Action:
             with open(repos_file_path, 'r') as file:
                 repo_paths = json.load(file)  # Load the JSON file into a list
         except json.JSONDecodeError as e:
-            logger.info(f"Error decoding JSON: {e}")
+            logger.error(f"Error decoding JSON: {e}")
             return []
         except FileNotFoundError:
-            logger.info(f"Error: File {repos_file_path} not found.")
+            logger.error(f"Error: File {repos_file_path} not found.")
             return []
         except Exception as e:
-            logger.info(f"Error reading file: {e}")
+            logger.error(f"Error reading file: {e}")
             return []
         
         def is_curdir_inside_path(base_path):
@@ -144,7 +178,7 @@ class Action:
 
             # Check if meta.yaml exists
             if not os.path.isfile(meta_yaml_path):
-                logger.info(f"Warning: {meta_yaml_path} not found. Skipping...")
+                logger.warning(f"Warning: {meta_yaml_path} not found. Skipping...")
                 continue
 
             # Load the YAML file
@@ -152,7 +186,7 @@ class Action:
                 with open(meta_yaml_path, 'r') as yaml_file:
                     meta = yaml.safe_load(yaml_file)
             except yaml.YAMLError as e:
-                logger.info(f"Error loading YAML in {meta_yaml_path}: {e}")
+                logger.error(f"Error loading YAML in {meta_yaml_path}: {e}")
                 continue
 
             if meta['alias'] == "local":
@@ -169,7 +203,7 @@ class Action:
 
         # Check if the file exists
         if not os.path.exists(repos_file_path):
-            logger.info(f"Error: File not found at {repos_file_path}")
+            logger.error(f"Error: File not found at {repos_file_path}")
             return None
 
         # Load and parse the JSON file
@@ -178,10 +212,10 @@ class Action:
                 repos = json.load(file)
                 return repos
         except json.JSONDecodeError as e:
-            logger.info(f"Error decoding JSON: {e}")
+            logger.error(f"Error decoding JSON: {e}")
             return None
         except Exception as e:
-            logger.info(f"Error reading file: {e}")
+            logger.error(f"Error reading file: {e}")
             return None
     
     def conflicting_repo(self, repo_meta):
@@ -794,7 +828,7 @@ class Index:
             else:
                 logger.info(f"Skipping {config_file}: Missing 'uid' field.")
         except Exception as e:
-            logger.info(f"Error processing {config_file}: {e}")
+            logger.error(f"Error processing {config_file}: {e}")
 
 
     def _save_indices(self):
@@ -812,7 +846,7 @@ class Index:
                     json.dump(index_data, f, indent=4, cls=CustomJSONEncoder)
                 logger.info(f"Shared index for {folder_type} saved to {output_file}.")
             except Exception as e:
-                logger.info(f"Error saving shared index for {folder_type}: {e}")
+                logger.error(f"Error saving shared index for {folder_type}: {e}")
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -1050,6 +1084,7 @@ class RepoAction(Action):
                 return res
 
         return {'return': 0}
+
             
     def list(self, run_args):
         logger.info("Listing all repositories.")
@@ -1216,7 +1251,7 @@ class CfgAction(Action):
         config_file = args.get('config_file', default_config_path)
         logger.info(f"In cfg load, config file = {config_file}")
         if not config_file or not os.path.exists(config_file):
-            logger.info(f"Error: Configuration file '{config_file}' not found.")
+            logger.error(f"Error: Configuration file '{config_file}' not found.")
             return {'return': 1, 'error': f"Error: Configuration file '{config_file}' not found."}
         
         #logger.info(f"Loading configuration from {config_file}")
@@ -1229,7 +1264,7 @@ class CfgAction(Action):
                 # Store configuration in memory or perform other operations
                 self.cfg = config_data
         except yaml.YAMLError as e:
-            logger.info(f"Error loading YAML configuration: {e}")
+            logger.error(f"Error loading YAML configuration: {e}")
         
         return {'return': 0, 'config': self.cfg}
 
@@ -1244,7 +1279,7 @@ class CfgAction(Action):
             logger.info(f"Unloading configuration.")
             del self.config  # Remove the loaded config from memory
         else:
-            logger.info("Error: No configuration is currently loaded.")
+            logger.error("Error: No configuration is currently loaded.")
 
 actions = {
         'repo': RepoAction,
