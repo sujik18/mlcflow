@@ -128,7 +128,7 @@ class Action:
             curdir = Path.cwd().resolve()
 
             # Check if curdir is inside base_path
-            return curdir in base_path.parents or curdir == base_path
+            return base_path in curdir.parents or curdir == base_path
 
         # Iterate through the list of repository paths
         for repo_path in repo_paths:
@@ -469,10 +469,10 @@ class Action:
         src_split = src_item.split(":")
         target_split = target_item.split(":")
         if len(src_split) > 1:
-            src_repo = src_split[0]
-            src_item = src_split[1]
+            src_repo = src_split[0].strip()
+            src_item = src_split[1].strip()
         else:
-            src_item = src_split[0]
+            src_item = src_split[0].strip()
 
         inp = {}
         inp['alias'] = src_item
@@ -494,16 +494,21 @@ class Action:
 
 
         if len(target_split) > 1:
-            target_repo = target_split[0]
-            target_repo_path = os.path.join(self.repo_path, target_repo)
+            target_repo = target_split[0].strip()
+            if target_repo == ".":
+                if not self.current_repo_path:
+                    return {'return': 1, 'error': f"""Current directory is not inside a registered MLC repo and so using ".:" is not valid"""}
+                target_repo = self.current_repo_path
+            target_repo_path = os.path.join(self.repos_path, target_repo)
             target_repo = Repo(target_repo_path)
-            target_item_name = target_split[1]
+            target_item_name = target_split[1].strip()
         else:
             target_repo = result.repo
             target_repo_path = result.repo.path
-            target_item_name = target_split[0]
+            target_item_name = target_split[0].strip()
 
-        target_item_path = os.path.join(target_repo_path, action_target, target_item)
+
+        target_item_path = os.path.join(target_repo_path, action_target, target_item_name)
         res = self.copy_item(src_item_path, target_item_path)
         if res['return'] > 0:
             return res
@@ -773,7 +778,7 @@ class Item:
 
 
 class Repo:
-    def __init__(self, path, meta):
+    def __init__(self, path, meta=None):
         self.path = path
         if meta:
             self.meta = meta
