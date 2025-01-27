@@ -1314,7 +1314,7 @@ def main():
         pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
-    for action in ['run', 'test', 'show', 'update', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
+    for action in ['run', 'test', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
@@ -1347,6 +1347,9 @@ def main():
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
 
+    if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
+        run_args['tags'] = args.details
+
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
         if hasattr(args, 'details') and args.details:
@@ -1368,4 +1371,3 @@ def main():
 if __name__ == '__main__':
     main()
 
-#__version__ = "0.0.1"
