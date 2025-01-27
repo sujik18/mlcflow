@@ -229,18 +229,12 @@ class Action:
 
     def __init__(self):        
         self.logger = logging.getLogger()
-        self.repos_path = os.environ.get('MLC_REPOS', os.path.expanduser('~/MLC/repos'))
-        '''
-        res = self.access({'action': 'load',
-                            'automation': 'cfg,88dce9c160324c5d',
-                            'item': 'default'})
-        
-        #if res['return'] > 0:
-        #    return res
-        if self.cfg:
-            mlc_local_repo_path = os.path.join(self.repos_path, self.cfg.get('MLC_LOCAL_REPO_FOLDER', 'local'))
+        temp_repo = os.environ.get('MLC_REPOS','').strip()
+        if temp_repo == '':
+            self.repos_path = os.path.expanduser('~/MLC/repos')
         else:
-        '''
+            self.repos_path = temp_repo
+
         mlc_local_repo_path = os.path.join(self.repos_path, 'local')
         
         mlc_local_repo_path_expanded = Path(mlc_local_repo_path).expanduser().resolve()
@@ -346,6 +340,72 @@ class Action:
             "message": f"Item successfully added at {item_path}",
             "path": item_path,
             "repo": repo
+        }
+    
+    def rm(self, i):
+        """
+        Removes an item to the repository.
+
+        Args:
+            i (dict): Input dictionary with the following keys:
+                - item_repo (tuple): Repository alias and UID (default: local repo).
+                - item (str): Item alias and optional UID in "alias,uid" format.
+                - tags (str): Comma-separated tags.
+                - new_tags (str): Additional comma-separated tags to add.
+                - yaml (bool): Whether to save metadata in YAML format. Defaults to JSON.
+
+        Returns:
+            dict: Result of the operation with 'return' code and error/message if applicable.
+        """
+
+        # Parse item details
+        item = i.get("item",i.get('artifact'))
+        item_name, item_id, item_tags = (None, None, None)
+        if item:
+            item_parts = item.split(",")
+            item_name = item_parts[0]
+            if len(item_parts) > 1:
+                item_id = item_parts[1]
+        elif i.get('tags'):
+            item_tags = i['tags']
+        else:
+            return {'return': 1, 'error': 'Item not given for rm action'}
+
+
+        inp = {}
+        if item_name:
+            inp['alias'] = item_name
+            inp['folder_name'] = item_name #we dont know if the user gave the alias or the folder name, we first check for alias and then the folder name
+            if self.is_uid(item_name):
+                inp['uid'] = item_name
+        elif item_id:
+            inp['uid'] = item_id
+        if item_tags:
+            inp['tags'] = item_tags
+
+        target_name = i.get('target_name', self.action_type)
+        inp['target_name'] = target_name
+        res = self.search(inp)
+
+        if len(res['list']) == 0:
+            return {'return': 1, 'error': f'No {target_name} found for {inp}'}
+        elif len(res['list']) > 1:
+            return {'return': 1, 'error': f'More than 1 {action_target} found for {inp}: {res["list"]}'}
+        else:
+            result = res['list'][0]
+            item_path = result.path
+            item_meta = result.meta
+        
+        
+        if os.path.exists(item_path):
+            shutil.rmtree(item_path)
+            logger.info(f"{target_name} item: {item_path} has been successfully removed")
+
+        self.index.rm(item_meta, target_name, item_path)
+        
+        return {
+            "return": 0,
+            "message": f"Item {item_path} successfully removed",
         }
 
     def save_new_meta(self, i, item_id, item_name, target_name, item_path, repo):
@@ -650,6 +710,14 @@ class Index:
                     "path": path,
                     "repo": repo
                 }
+
+    def rm(self, meta, folder_type, path):
+        uid = meta['uid']
+        index = self.get_index(folder_type, uid)
+        if index == -1: 
+            logger.warn(f"Index is not having the {folder_type} item {path}")
+        else:
+            del(self.indices[folder_type][index])
 
     def build_index(self):
         """
@@ -1023,6 +1091,12 @@ class ScriptAction(Action):
             i['target_name'] = "script"
         return super().search(i)
 
+    def rm(self, i):
+        if not i.get('target_name'):
+            i['target_name'] = "script"
+        logger.debug(f"Removing script with input: {i}")
+        return super().rm(i)
+
     def dynamic_import_module(self, script_path):
         # Validate the script_path
         if not os.path.exists(script_path):
@@ -1045,6 +1119,8 @@ class ScriptAction(Action):
         spec.loader.exec_module(module)
 
         return module
+
+    find = search
 
     def call_script_module_function(self, function_name, run_args):
         self.action_type = "script"
@@ -1103,19 +1179,18 @@ class CacheAction(Action):
         logger.debug(f"Searching for cache with input: {i}")
         return super().search(i)
 
+    def rm(self, i):
+        i['target_name'] = "cache"
+        logger.debug(f"Removing cache with input: {i}")
+        return super().rm(i)
+
     def show(self, run_args):
         self.action_type = "cache"
         logger.info(f"Showing cache with identifier: {args.details}")
         run_args['target_name'] = "cache"
         return self.search(run_args)
 
-    def find(self, run_args):
-        #logger.info(f"Running script with identifier: {args.details}")
-        # The REPOS folder is set by the user, for example via an environment variable.
-        #logger.info(f"In cache action {repos_folder}")
-
-        run_args['target_name'] = "cache"
-        return self.search(run_args)
+    find = search
 
     def list(self, args):
         logger.info("Listing all caches.")
