@@ -178,8 +178,37 @@ def run_system_cmd(i):
         return {'return': 1, 'error': f"Unexpected error occurred: {str(e)}"}
 
 
-def print_env(env):
-    print_formatted_json(env)
+def print_env(env, yaml=True, sort_keys=True):
+    printd(env, yaml=yaml, sort_keys=sort_keys)
+
+def printd(mydict, yaml=True, sort_keys=True):
+    if yaml:
+        print_formatted_yaml(mydict, sort_keys=True)
+    else:
+        print_formatted_json(mydict)
+
+def print_formatted_yaml(data, sort_keys=True):
+    """
+    Converts a Python dictionary (or other serializable object) to a YAML-formatted
+    string and prints it in a human-readable format.
+
+    Args:
+        data (dict or list): The data to format as YAML and print.
+
+    Example:
+        my_data = {"name": "John", "age": 30, "skills": ["Python", "ML"]}
+        print_formatted_yaml(my_data)
+    """
+    try:
+        yaml_string = yaml.dump(
+            data, 
+            default_flow_style=False, 
+            sort_keys=False, 
+            allow_unicode=True
+        )
+        print(yaml_string)
+    except yaml.YAMLError as e:
+        print(f"Error formatting YAML: {e}")
 
 def print_formatted_json(data):
     """
