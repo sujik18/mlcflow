@@ -13,6 +13,7 @@ import mlc.utils as utils
 from pathlib import Path
 from colorama import Fore, Style, init
 import shutil
+
 # Initialize colorama for Windows support
 init(autoreset=True)
 class ColoredFormatter(logging.Formatter):
@@ -29,31 +30,13 @@ class ColoredFormatter(logging.Formatter):
             record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
         return super().format(record)
 
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# Create console handler with the custom formatter
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-
-# Remove any existing handlers and add our custom handler
-if logger.hasHandlers():
-    logger.handlers.clear()
-
-logger.addHandler(console_handler)
-
-# # Set up logging configuration
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# logger = logging.getLogger(__name__)
-
 
 # Set up logging configuration
 def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
     
-    logFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logFormatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger.setLevel(logging.INFO)
     
     # File hander for logging in file in the specified path
     file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
@@ -65,10 +48,6 @@ def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
     consoleHandler.setFormatter(logFormatter)
     logger.addHandler(consoleHandler)
 
-# Testing the log  
-# setup_logging(log_path='.',log_file='mlc-log2.txt')
-# logger = logging.getLogger(__name__)
-# logger.info('This is an info message')
 
 # Base class for CLI actions
 class Action:
@@ -262,7 +241,8 @@ class Action:
 
 
     def __init__(self):        
-        self.logger = logging.getLogger()
+        setup_logging(log_path='.',log_file='mlc-log.txt')
+        self.logger = logger
         temp_repo = os.environ.get('MLC_REPOS','').strip()
         if temp_repo == '':
             self.repos_path = os.path.expanduser('~/MLC/repos')
@@ -424,18 +404,26 @@ class Action:
         if len(res['list']) == 0:
             return {'return': 1, 'error': f'No {target_name} found for {inp}'}
         elif len(res['list']) > 1:
-            return {'return': 1, 'error': f'More than 1 {action_target} found for {inp}: {res["list"]}'}
-        else:
-            result = res['list'][0]
+            print(f"More than 1 {target_name} found for {inp}:")
+            if not i.get('all'):
+                for idx, item in enumerate(res["list"]):
+                    print(f"{idx}. Path: {item.path}, Meta: {item.meta}")
+
+                user_choice = input("Would you like to proceed with all items? (yes/no): ").strip().lower()
+                if user_choice not in ['yes', 'y']:
+                    return {'return': 1, 'error': "Operation aborted by user."}
+        results = res['list']
+        
+        for result in results:
             item_path = result.path
             item_meta = result.meta
         
         
-        if os.path.exists(item_path):
-            shutil.rmtree(item_path)
-            logger.info(f"{target_name} item: {item_path} has been successfully removed")
+            if os.path.exists(item_path):
+                shutil.rmtree(item_path)
+                logger.info(f"{target_name} item: {item_path} has been successfully removed")
 
-        self.index.rm(item_meta, target_name, item_path)
+            self.index.rm(item_meta, target_name, item_path)
         
         return {
             "return": 0,
@@ -1326,7 +1314,7 @@ def main():
         pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
-    for action in ['run', 'test', 'show', 'update', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
+    for action in ['run', 'test', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
@@ -1359,6 +1347,9 @@ def main():
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
 
+    if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
+        run_args['tags'] = args.details
+
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
         if hasattr(args, 'details') and args.details:
@@ -1380,4 +1371,3 @@ def main():
 if __name__ == '__main__':
     main()
 
-#__version__ = "0.0.1"
