@@ -35,12 +35,12 @@ logger = logging.getLogger(__name__)
 # Set up logging configuration
 def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
     
-    logFormatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logFormatter = ColoredFormatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s')
     logger.setLevel(logging.INFO)
     
     # File hander for logging in file in the specified path
     file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
-    file_handler.setFormatter(logFormatter)
+    file_handler.setFormatter(logging.Formatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s'))
     logger.addHandler(file_handler)
     
     # Console handler for logging on console
@@ -617,7 +617,7 @@ class Action:
 
         if res['return'] > 0:
             return res
-        logging.info(f"{action_target} {src_item_path} copied to {target_item_path}")
+        logger.info(f"{action_target} {src_item_path} copied to {target_item_path}")
 
         return {'return': 0}
 
@@ -625,7 +625,7 @@ class Action:
         try:
             # Copy the source folder to the destination
             shutil.copytree(source_path, destination_path)
-            logging.info(f"Folder successfully copied from {source_path} to {destination_path}")
+            logger.info(f"Folder successfully copied from {source_path} to {destination_path}")
         except FileExistsError:
             return {'return': 1, 'error': f"Destination folder {destination_path} already exists."}
         except FileNotFoundError:
