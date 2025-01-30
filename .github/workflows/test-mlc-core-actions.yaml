@@ -117,8 +117,8 @@ jobs:
 
     - name: Test 7 - find cache - More than one cache present
       run: |
-        mlc find cache --tags=get,imagenet-aux 2>&1 | tee test7.log
-        mlc find cache --tags=detect,os 2>&1 | tee test5.log
+        mlc search cache --tags=get,imagenet-aux 2>&1 | tee test7.log
+        mlc search cache --tags=detect,os 2>&1 | tee test5.log
         if grep -q "No cache entry found for the specified tags!" test5.log; then
           exit 1
         fi
