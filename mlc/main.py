@@ -35,12 +35,12 @@ logger = logging.getLogger(__name__)
 # Set up logging configuration
 def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
     
-    logFormatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logFormatter = ColoredFormatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s')
     logger.setLevel(logging.INFO)
     
     # File hander for logging in file in the specified path
     file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
-    file_handler.setFormatter(logFormatter)
+    file_handler.setFormatter(logging.Formatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s'))
     logger.addHandler(file_handler)
     
     # Console handler for logging on console
@@ -59,6 +59,7 @@ class Action:
     current_repo_path = None
     #mlc = None
     repos = [] #list of Repo objects
+
     def execute(self, args):
         raise NotImplementedError("Subclasses must implement the execute method")
 
@@ -617,7 +618,7 @@ class Action:
 
         if res['return'] > 0:
             return res
-        logging.info(f"{action_target} {src_item_path} copied to {target_item_path}")
+        logger.info(f"{action_target} {src_item_path} copied to {target_item_path}")
 
         return {'return': 0}
 
@@ -625,7 +626,7 @@ class Action:
         try:
             # Copy the source folder to the destination
             shutil.copytree(source_path, destination_path)
-            logging.info(f"Folder successfully copied from {source_path} to {destination_path}")
+            logger.info(f"Folder successfully copied from {source_path} to {destination_path}")
         except FileExistsError:
             return {'return': 1, 'error': f"Destination folder {destination_path} already exists."}
         except FileNotFoundError:
@@ -675,6 +676,7 @@ class Action:
                         it = Item(res['path'], res['repo'])
                         result.append(it)
         return {'return': 0, 'list': result}
+
 
 
 class Index:
@@ -913,8 +915,6 @@ class Automation:
             logger.info(f"No meta file found in {self.path}")
 
     def search(self, i):
-        #logger.info(i)
-        #logger.info(self)
         indices = self.action_object.index.indices
         target_index = indices.get(self.automation_type)
         result = []
@@ -928,9 +928,6 @@ class Automation:
                 if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
                     it = Item(res['path'], res['repo'])
                     result.append(it)
-            #logger.info(f"p_tags={p_tags}")
-            #logger.info(f"n_tags={n_tags}")
-            #for key in indices:
         #logger.info(result)
         return {'return': 0, 'list': result}
         #indices
@@ -1109,16 +1106,23 @@ class RepoAction(Action):
         
 
 class ScriptAction(Action):
+    parent = None
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        self.parent = parent
+        self.__dict__.update(vars(parent))
+
     def search(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
-        return super().search(i)
+        return self.parent.search(i)
 
     def rm(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
         logger.debug(f"Removing script with input: {i}")
-        return super().rm(i)
+        return self.parent.rm(i)
 
     def dynamic_import_module(self, script_path):
         # Validate the script_path
@@ -1170,7 +1174,7 @@ class ScriptAction(Action):
             
             if result['return'] > 0:
                 error = result.get('error', "")
-                raise ScriptExecutionError(f"Script docker execution failed. Error : {error}")
+                raise ScriptExecutionError(f"Script {function_name} execution failed. Error : {error}")
             return result
         else:
             logger.info("ScriptAutomation class not found in the script.")
@@ -1194,16 +1198,23 @@ class ScriptExecutionError(Exception):
     pass
 
 class CacheAction(Action):
+
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
     
     def search(self, i):
         i['target_name'] = "cache"
-        logger.debug(f"Searching for cache with input: {i}")
-        return super().search(i)
+        #logger.debug(f"Searching for cache with input: {i}")
+        return self.parent.search(i)
 
     def rm(self, i):
         i['target_name'] = "cache"
-        logger.debug(f"Removing cache with input: {i}")
-        return super().rm(i)
+        #logger.debug(f"Removing cache with input: {i}")
+        return self.parent.rm(i)
 
     def show(self, run_args):
         self.action_type = "cache"
@@ -1296,6 +1307,11 @@ def mlcr():
 
     # Call the main function
     main()
+
+default_parent = None
+
+if default_parent is None:
+    default_parent = Action()
 
 # Main CLI function
 def main():
