@@ -13,6 +13,7 @@ import mlc.utils as utils
 from pathlib import Path
 from colorama import Fore, Style, init
 import shutil
+
 # Initialize colorama for Windows support
 init(autoreset=True)
 class ColoredFormatter(logging.Formatter):
@@ -29,35 +30,17 @@ class ColoredFormatter(logging.Formatter):
             record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
         return super().format(record)
 
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# Create console handler with the custom formatter
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-
-# Remove any existing handlers and add our custom handler
-if logger.hasHandlers():
-    logger.handlers.clear()
-
-logger.addHandler(console_handler)
-
-# # Set up logging configuration
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# logger = logging.getLogger(__name__)
-
 
 # Set up logging configuration
 def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
     
-    logFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logFormatter = ColoredFormatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s')
+    logger.setLevel(logging.INFO)
     
     # File hander for logging in file in the specified path
     file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
-    file_handler.setFormatter(logFormatter)
+    file_handler.setFormatter(logging.Formatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s'))
     logger.addHandler(file_handler)
     
     # Console handler for logging on console
@@ -65,10 +48,6 @@ def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
     consoleHandler.setFormatter(logFormatter)
     logger.addHandler(consoleHandler)
 
-# Testing the log  
-# setup_logging(log_path='.',log_file='mlc-log2.txt')
-# logger = logging.getLogger(__name__)
-# logger.info('This is an info message')
 
 # Base class for CLI actions
 class Action:
@@ -80,6 +59,7 @@ class Action:
     current_repo_path = None
     #mlc = None
     repos = [] #list of Repo objects
+
     def execute(self, args):
         raise NotImplementedError("Subclasses must implement the execute method")
 
@@ -262,7 +242,8 @@ class Action:
 
 
     def __init__(self):        
-        self.logger = logging.getLogger()
+        setup_logging(log_path='.',log_file='mlc-log.txt')
+        self.logger = logger
         temp_repo = os.environ.get('MLC_REPOS','').strip()
         if temp_repo == '':
             self.repos_path = os.path.expanduser('~/MLC/repos')
@@ -424,18 +405,26 @@ class Action:
         if len(res['list']) == 0:
             return {'return': 1, 'error': f'No {target_name} found for {inp}'}
         elif len(res['list']) > 1:
-            return {'return': 1, 'error': f'More than 1 {action_target} found for {inp}: {res["list"]}'}
-        else:
-            result = res['list'][0]
+            print(f"More than 1 {target_name} found for {inp}:")
+            if not i.get('all'):
+                for idx, item in enumerate(res["list"]):
+                    print(f"{idx}. Path: {item.path}, Meta: {item.meta}")
+
+                user_choice = input("Would you like to proceed with all items? (yes/no): ").strip().lower()
+                if user_choice not in ['yes', 'y']:
+                    return {'return': 1, 'error': "Operation aborted by user."}
+        results = res['list']
+        
+        for result in results:
             item_path = result.path
             item_meta = result.meta
         
         
-        if os.path.exists(item_path):
-            shutil.rmtree(item_path)
-            logger.info(f"{target_name} item: {item_path} has been successfully removed")
+            if os.path.exists(item_path):
+                shutil.rmtree(item_path)
+                logger.info(f"{target_name} item: {item_path} has been successfully removed")
 
-        self.index.rm(item_meta, target_name, item_path)
+            self.index.rm(item_meta, target_name, item_path)
         
         return {
             "return": 0,
@@ -629,7 +618,7 @@ class Action:
 
         if res['return'] > 0:
             return res
-        logging.info(f"{action_target} {src_item_path} copied to {target_item_path}")
+        logger.info(f"{action_target} {src_item_path} copied to {target_item_path}")
 
         return {'return': 0}
 
@@ -637,7 +626,7 @@ class Action:
         try:
             # Copy the source folder to the destination
             shutil.copytree(source_path, destination_path)
-            logging.info(f"Folder successfully copied from {source_path} to {destination_path}")
+            logger.info(f"Folder successfully copied from {source_path} to {destination_path}")
         except FileExistsError:
             return {'return': 1, 'error': f"Destination folder {destination_path} already exists."}
         except FileNotFoundError:
@@ -687,6 +676,7 @@ class Action:
                         it = Item(res['path'], res['repo'])
                         result.append(it)
         return {'return': 0, 'list': result}
+
 
 
 class Index:
@@ -925,8 +915,6 @@ class Automation:
             logger.info(f"No meta file found in {self.path}")
 
     def search(self, i):
-        #logger.info(i)
-        #logger.info(self)
         indices = self.action_object.index.indices
         target_index = indices.get(self.automation_type)
         result = []
@@ -940,9 +928,6 @@ class Automation:
                 if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
                     it = Item(res['path'], res['repo'])
                     result.append(it)
-            #logger.info(f"p_tags={p_tags}")
-            #logger.info(f"n_tags={n_tags}")
-            #for key in indices:
         #logger.info(result)
         return {'return': 0, 'list': result}
         #indices
@@ -1121,16 +1106,23 @@ class RepoAction(Action):
         
 
 class ScriptAction(Action):
+    parent = None
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        self.parent = parent
+        self.__dict__.update(vars(parent))
+
     def search(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
-        return super().search(i)
+        return self.parent.search(i)
 
     def rm(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
         logger.debug(f"Removing script with input: {i}")
-        return super().rm(i)
+        return self.parent.rm(i)
 
     def dynamic_import_module(self, script_path):
         # Validate the script_path
@@ -1182,7 +1174,7 @@ class ScriptAction(Action):
             
             if result['return'] > 0:
                 error = result.get('error', "")
-                raise ScriptExecutionError(f"Script docker execution failed. Error : {error}")
+                raise ScriptExecutionError(f"Script {function_name} execution failed. Error : {error}")
             return result
         else:
             logger.info("ScriptAutomation class not found in the script.")
@@ -1207,16 +1199,23 @@ class ScriptExecutionError(Exception):
     pass
 
 class CacheAction(Action):
+
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
     
     def search(self, i):
         i['target_name'] = "cache"
-        logger.debug(f"Searching for cache with input: {i}")
-        return super().search(i)
+        #logger.debug(f"Searching for cache with input: {i}")
+        return self.parent.search(i)
 
     def rm(self, i):
         i['target_name'] = "cache"
-        logger.debug(f"Removing cache with input: {i}")
-        return super().rm(i)
+        #logger.debug(f"Removing cache with input: {i}")
+        return self.parent.rm(i)
 
     def show(self, run_args):
         self.action_type = "cache"
@@ -1308,6 +1307,11 @@ def mlcr():
     # Call the main function
     main()
 
+default_parent = None
+
+if default_parent is None:
+    default_parent = Action()
+
 # Main CLI function
 def main():
     parser = argparse.ArgumentParser(prog='mlc', description='A CLI tool for managing repos, scripts, and caches.')
@@ -1325,7 +1329,7 @@ def main():
         pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
-    for action in ['run', 'test', 'show', 'update', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
+    for action in ['run', 'test', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
@@ -1358,9 +1362,13 @@ def main():
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
 
+
     if args.command in ['rm']:
         if args.target == "repo":
             run_args['repo'] = args.details
+  
+    if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
+        run_args['tags'] = args.details
 
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
@@ -1383,4 +1391,3 @@ def main():
 if __name__ == '__main__':
     main()
 
-#__version__ = "0.0.1"
