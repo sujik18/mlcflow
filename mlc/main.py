@@ -1313,6 +1313,16 @@ default_parent = None
 if default_parent is None:
     default_parent = Action()
 
+def process_console_output(res, target, action, run_args):
+    if action == "find":
+        if len(res['list']) == 0:
+            logger.warn(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
+        else:
+            for item in res['list']:
+                logger.info(f"""Item path: {item.path}""")
+
+
+
 # Main CLI function
 def main():
     parser = argparse.ArgumentParser(prog='mlc', description='A CLI tool for managing repos, scripts, and caches.')
@@ -1386,6 +1396,7 @@ def main():
         res = method(run_args)
         if res['return'] > 0:
             logger.error(res.get('error', f"Error in {action}"))
+        process_console_output(res, args.target, args.command, run_args)
     else:
         logger.info(f"Error: '{args.command}' is not supported for {args.target}.")
 
