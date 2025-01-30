@@ -59,6 +59,7 @@ class Action:
     current_repo_path = None
     #mlc = None
     repos = [] #list of Repo objects
+
     def execute(self, args):
         raise NotImplementedError("Subclasses must implement the execute method")
 
@@ -677,6 +678,7 @@ class Action:
         return {'return': 0, 'list': result}
 
 
+
 class Index:
     def __init__(self, repos_path, repos):
         """
@@ -913,8 +915,6 @@ class Automation:
             logger.info(f"No meta file found in {self.path}")
 
     def search(self, i):
-        #logger.info(i)
-        #logger.info(self)
         indices = self.action_object.index.indices
         target_index = indices.get(self.automation_type)
         result = []
@@ -928,9 +928,6 @@ class Automation:
                 if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
                     it = Item(res['path'], res['repo'])
                     result.append(it)
-            #logger.info(f"p_tags={p_tags}")
-            #logger.info(f"n_tags={n_tags}")
-            #for key in indices:
         #logger.info(result)
         return {'return': 0, 'list': result}
         #indices
@@ -1109,16 +1106,23 @@ class RepoAction(Action):
         
 
 class ScriptAction(Action):
+    parent = None
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        self.parent = parent
+        self.__dict__.update(vars(parent))
+
     def search(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
-        return super().search(i)
+        return self.parent.search(i)
 
     def rm(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
         logger.debug(f"Removing script with input: {i}")
-        return super().rm(i)
+        return self.parent.rm(i)
 
     def dynamic_import_module(self, script_path):
         # Validate the script_path
@@ -1170,7 +1174,7 @@ class ScriptAction(Action):
             
             if result['return'] > 0:
                 error = result.get('error', "")
-                raise ScriptExecutionError(f"Script docker execution failed. Error : {error}")
+                raise ScriptExecutionError(f"Script {function_name} execution failed. Error : {error}")
             return result
         else:
             logger.info("ScriptAutomation class not found in the script.")
@@ -1194,16 +1198,23 @@ class ScriptExecutionError(Exception):
     pass
 
 class CacheAction(Action):
+
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
     
     def search(self, i):
         i['target_name'] = "cache"
-        logger.debug(f"Searching for cache with input: {i}")
-        return super().search(i)
+        #logger.debug(f"Searching for cache with input: {i}")
+        return self.parent.search(i)
 
     def rm(self, i):
         i['target_name'] = "cache"
-        logger.debug(f"Removing cache with input: {i}")
-        return super().rm(i)
+        #logger.debug(f"Removing cache with input: {i}")
+        return self.parent.rm(i)
 
     def show(self, run_args):
         self.action_type = "cache"
@@ -1296,6 +1307,11 @@ def mlcr():
 
     # Call the main function
     main()
+
+default_parent = None
+
+if default_parent is None:
+    default_parent = Action()
 
 # Main CLI function
 def main():
