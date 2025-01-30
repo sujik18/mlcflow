@@ -1211,6 +1211,7 @@ class CacheAction(Action):
         i['target_name'] = "cache"
         #logger.debug(f"Searching for cache with input: {i}")
         return self.parent.search(i)
+    find = search
 
     def rm(self, i):
         i['target_name'] = "cache"
