@@ -84,9 +84,7 @@ class Action:
         action_target_split = action_target.split(",")
         action_target = action_target_split[0]
 
-        #print(f"action_target = {action_target}")
         action = actions.get(action_target)
-        #logger.info(f"action = {action}")
 
         if action:
             if hasattr(action, action_name):
@@ -359,7 +357,7 @@ class Action:
     
     def rm(self, i):
         """
-        Removes an item to the repository.
+        Removes an item from the repository.
 
         Args:
             i (dict): Input dictionary with the following keys:
@@ -405,10 +403,10 @@ class Action:
         if len(res['list']) == 0:
             return {'return': 1, 'error': f'No {target_name} found for {inp}'}
         elif len(res['list']) > 1:
-            print(f"More than 1 {target_name} found for {inp}:")
+            logger.info(f"More than 1 {target_name} found for {inp}:")
             if not i.get('all'):
                 for idx, item in enumerate(res["list"]):
-                    print(f"{idx}. Path: {item.path}, Meta: {item.meta}")
+                    logger.info(f"{idx}. Path: {item.path}, Meta: {item.meta}")
 
                 user_choice = input("Would you like to proceed with all items? (yes/no): ").strip().lower()
                 if user_choice not in ['yes', 'y']:
