@@ -1176,6 +1176,7 @@ class ScriptAction(Action):
             return result
         else:
             logger.info("ScriptAutomation class not found in the script.")
+            return {'return': 1, 'error': 'ScriptAutomation class not found in the script.'}
 
     def docker(self, run_args):
         return self.call_script_module_function("docker", run_args)
@@ -1218,8 +1219,6 @@ class CacheAction(Action):
     def show(self, run_args):
         self.action_type = "cache"
         logger.info(f"Showing cache with identifier: {args.details}")
-        run_args['target_name'] = "cache"
-        return self.search(run_args)
 
     def list(self, args):
         logger.info("Listing all caches.")
@@ -1372,6 +1371,11 @@ def main():
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
 
+
+    if args.command in ['rm']:
+        if args.target == "repo":
+            run_args['repo'] = args.details
+  
     if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
         run_args['tags'] = args.details
 
