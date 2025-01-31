@@ -47,7 +47,16 @@ mlc <action> <target> [options]
 #### 3. **Cache**
 - Handle cached data, including cleanup or inspection.
 
-Each target has its own set of specific actions to tailor automation workflows.
+Each target has its own set of specific actions to tailor automation workflows as specified below.
+
+
+
+| Target | Action          |
+|--------|-----------------|
+| script    | run, search, rm, mv, cp, add, list, test, docker, show          |
+| cache    | search, rm, list, show, find          |
+| repo    | pull, search, rm, list, find          |
+
 
 ## CM compatibility layer
 
