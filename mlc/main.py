@@ -84,9 +84,7 @@ class Action:
         action_target_split = action_target.split(",")
         action_target = action_target_split[0]
 
-        #print(f"action_target = {action_target}")
         action = actions.get(action_target)
-        #logger.info(f"action = {action}")
 
         if action:
             if hasattr(action, action_name):
@@ -359,7 +357,7 @@ class Action:
     
     def rm(self, i):
         """
-        Removes an item to the repository.
+        Removes an item from the repository.
 
         Args:
             i (dict): Input dictionary with the following keys:
@@ -405,10 +403,10 @@ class Action:
         if len(res['list']) == 0:
             return {'return': 1, 'error': f'No {target_name} found for {inp}'}
         elif len(res['list']) > 1:
-            print(f"More than 1 {target_name} found for {inp}:")
+            logger.info(f"More than 1 {target_name} found for {inp}:")
             if not i.get('all'):
                 for idx, item in enumerate(res["list"]):
-                    print(f"{idx}. Path: {item.path}, Meta: {item.meta}")
+                    logger.info(f"{idx}. Path: {item.path}, Meta: {item.meta}")
 
                 user_choice = input("Would you like to proceed with all items? (yes/no): ").strip().lower()
                 if user_choice not in ['yes', 'y']:
@@ -691,7 +689,7 @@ class Index:
         self.repos = repos
         #logger.info(repos)
 
-        logger.info(f"Repos path for Index: {self.repos_path}")
+        logger.debug(f"Repos path for Index: {self.repos_path}")
         self.index_files = {
             "script": os.path.join(repos_path, "index_script.json"),
             "cache": os.path.join(repos_path, "index_cache.json"),
@@ -834,7 +832,7 @@ class Index:
             try:
                 with open(output_file, "w") as f:
                     json.dump(index_data, f, indent=4, cls=CustomJSONEncoder)
-                logger.info(f"Shared index for {folder_type} saved to {output_file}.")
+                logger.debug(f"Shared index for {folder_type} saved to {output_file}.")
             except Exception as e:
                 logger.error(f"Error saving shared index for {folder_type}: {e}")
 
@@ -1220,17 +1218,49 @@ class CacheAction(Action):
 
     def show(self, run_args):
         self.action_type = "cache"
-        logger.info(f"Showing cache with identifier: {args.details}")
+        res = self.search(run_args)
+        logger.info(f"Showing cache with tags: {run_args.get('tags')}")
+        cached_meta_keys_to_show = ["uid", "tags", "dependent_cached_path", "associated_script_item"]
+        cached_state_keys_to_show = ["new_env", "new_state", "version"]
+        for item in res['list']:
+            print(f"""Location: {item.path}:
+Cache Meta:""")
+            for key in cached_meta_keys_to_show:
+                if key in item.meta:
+                    print(f"""    {key}: {item.meta[key]}""")
+            print("""Cached State:""")
+            cached_state_meta_file = os.path.join(item.path, "mlc-cached-state.json")
+            try:
+                # Load and parse the JSON file containing the cached state
+                with open(cached_state_meta_file, 'r') as file:
+                    meta = json.load(file)
+                    for key in cached_state_keys_to_show:
+                        if key in meta:
+                            print(f"""    {key}:""", end="")
+                            if meta[key] and isinstance(meta[key], dict):
+                                print("")
+                                utils.printd(meta[key], yaml=False, sort_keys=True, begin_spaces=8)
+                            else:
+                                print(f""" {meta[key]}""")
+            except json.JSONDecodeError as e:
+                logger.error(f"Error decoding JSON: {e}")
+            print("......................................................")
+            print("")
+            
+        return {'return': 0}
 
     def list(self, args):
         logger.info("Listing all caches.")
+        return {'return': 0}
 
 class ExperimentAction(Action):
     def show(self, args):
         logger.info(f"Showing experiment with identifier: {args.details}")
+        return {'return': 0}
 
     def list(self, args):
         logger.info("Listing all experiments.")
+        return {'return': 0}
 
 
 class CfgAction(Action):
@@ -1263,18 +1293,6 @@ class CfgAction(Action):
         
         return {'return': 0, 'config': self.cfg}
 
-    def unload(self, args):
-        """
-        Unload the configuration.
-        
-        Args:
-            args (dict): Optional, could be used to specify a particular configuration to unload.
-        """
-        if hasattr(self, 'config'):
-            logger.info(f"Unloading configuration.")
-            del self.config  # Remove the loaded config from memory
-        else:
-            logger.error("Error: No configuration is currently loaded.")
 
 actions = {
         'repo': RepoAction,
