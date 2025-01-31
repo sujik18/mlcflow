@@ -54,8 +54,8 @@ Each target has its own set of specific actions to tailor automation workflows a
 | Target | Action          |
 |--------|-----------------|
 | script    | run, search, rm, mv, cp, add, list, test, docker, show          |
-| cache    | search, rm, list, show          |
-| repo    | pull, search, rm, list          |
+| cache    | search, rm, list, show, find          |
+| repo    | pull, search, rm, list, find          |
 
 
 ## CM compatibility layer
