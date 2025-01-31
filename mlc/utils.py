@@ -178,16 +178,16 @@ def run_system_cmd(i):
         return {'return': 1, 'error': f"Unexpected error occurred: {str(e)}"}
 
 
-def print_env(env, yaml=True, sort_keys=True):
-    printd(env, yaml=yaml, sort_keys=sort_keys)
+def print_env(env, yaml=True, sort_keys=True, begin_spaces=None):
+    printd(env, yaml=yaml, sort_keys=sort_keys, begin_spaces=begin_spaces)
 
-def printd(mydict, yaml=True, sort_keys=True):
+def printd(mydict, yaml=True, sort_keys=True, begin_spaces = None):
     if yaml:
-        print_formatted_yaml(mydict, sort_keys=True)
+        print_formatted_yaml(mydict, sort_keys=sort_keys, begin_spaces=begin_spaces)
     else:
-        print_formatted_json(mydict)
+        print_formatted_json(mydict, sort_keys = sort_keys, begin_spaces = begin_spaces)
 
-def print_formatted_yaml(data, sort_keys=True):
+def print_formatted_yaml(data, sort_keys=True, begin_spaces = None):
     """
     Converts a Python dictionary (or other serializable object) to a YAML-formatted
     string and prints it in a human-readable format.
@@ -206,11 +206,15 @@ def print_formatted_yaml(data, sort_keys=True):
             sort_keys=False, 
             allow_unicode=True
         )
-        print(yaml_string)
+        if not begin_spaces:
+            print(yaml_string)
+        else:
+            indented_yaml_str = "\n".join(" " * begin_spaces + line for line in yaml_string.splitlines())
+            print(indented_yaml_str)
     except yaml.YAMLError as e:
         print(f"Error formatting YAML: {e}")
 
-def print_formatted_json(data):
+def print_formatted_json(data, sort_keys = True, begin_spaces = None):
     """
     Prints a dictionary as a formatted JSON string.
 
@@ -221,8 +225,12 @@ def print_formatted_json(data):
         None
     """
     try:
-        formatted_json = json.dumps(data, indent=4, sort_keys=True)
-        print(formatted_json)
+        formatted_json = json.dumps(data, indent=4, sort_keys=sort_keys)
+        if not begin_spaces:
+            print(formatted_json)
+        else:
+            indented_json_str = "\n".join(" " * begin_spaces + line for line in formatted_json.splitlines())
+            print(indented_json_str)
     except TypeError as e:
         print(f"Error formatting JSON: {e}")
 
