@@ -65,39 +65,6 @@ MLC has a compatibility layer where by it supports MLCommons CM automations - Sc
 ## Architectural Diagram
 
 ```mermaid
-I cannot generate an architectural diagram directly, but I can help you understand the key components and structure of the code, which you can use to create a mermaid diagram manually.
-
-Here are the key elements and relationships in the code:
-
-1. **Classes:**
-   - `Action`
-     - `RepoAction` (extends `Action`)
-     - `ScriptAction` (extends `Action`)
-     - `CacheAction` (extends `Action`)
-     - `ExperimentAction` (extends `Action`)
-     - `CfgAction` (extends `Action`)
-   - `Index`
-   - `Item`
-   - `Repo`
-   - `Automation`
-
-2. **Functions:**
-   - `setup_logging`
-   - `get_action`
-   - `access`
-   - `main`
-   - `mlcr`
-   - `process_console_output`
-
-3. **Relationships:**
-   - `Action` is the base class for specific action classes (`RepoAction`, `ScriptAction`, `CacheAction`, `ExperimentAction`, `CfgAction`).
-   - `Index` is initialized with a list of repositories and builds indices.
-   - `Item` and `Repo` are used to represent individual items and repositories.
-   - `Automation` is used to manage automation tasks and loads metadata.
-
-Here's a basic representation you can use in a mermaid diagram:
-
-```mermaid
 classDiagram
     class Action {
         +execute(args)
