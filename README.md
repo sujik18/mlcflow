@@ -67,7 +67,6 @@ MLC has a compatibility layer where by it supports MLCommons CM automations - Sc
 ```mermaid
 classDiagram
     class Action {
-        +execute(args)
         +access(options)
         +find_target_folder(target)
         +load_repos_and_meta()
