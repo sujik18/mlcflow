@@ -65,29 +65,81 @@ MLC has a compatibility layer where by it supports MLCommons CM automations - Sc
 ## Architectural Diagram
 
 ```mermaid
+I cannot generate an architectural diagram directly, but I can help you understand the key components and structure of the code, which you can use to create a mermaid diagram manually.
+
+Here are the key elements and relationships in the code:
+
+1. **Classes:**
+   - `Action`
+     - `RepoAction` (extends `Action`)
+     - `ScriptAction` (extends `Action`)
+     - `CacheAction` (extends `Action`)
+     - `ExperimentAction` (extends `Action`)
+     - `CfgAction` (extends `Action`)
+   - `Index`
+   - `Item`
+   - `Repo`
+   - `Automation`
+
+2. **Functions:**
+   - `setup_logging`
+   - `get_action`
+   - `access`
+   - `main`
+   - `mlcr`
+   - `process_console_output`
+
+3. **Relationships:**
+   - `Action` is the base class for specific action classes (`RepoAction`, `ScriptAction`, `CacheAction`, `ExperimentAction`, `CfgAction`).
+   - `Index` is initialized with a list of repositories and builds indices.
+   - `Item` and `Repo` are used to represent individual items and repositories.
+   - `Automation` is used to manage automation tasks and loads metadata.
+
+Here's a basic representation you can use in a mermaid diagram:
+
+```mermaid
 classDiagram
     class Action {
-        -repos_path : str
-        -cfg : dict
-        -repos : list
         +execute(args)
         +access(options)
-        +asearch(i)
         +find_target_folder(target)
         +load_repos_and_meta()
         +load_repos()
+        +conflicting_repo(repo_meta)
+        +register_repo(repo_meta)
+        +unregister_repo(repo_path)
+        +add(i)
+        +rm(i)
+        +save_new_meta(i, item_id, item_name, target_name, item_path, repo)
+        +update(i)
+        +is_uid(name)
+        +cp(run_args)
+        +copy_item(source_path, destination_path)
+        +search(i)
     }
     class RepoAction {
+        +find(run_args)
         +github_url_to_user_repo_format(url)
-        +pull(args)
-        +list(args)
+        +pull_repo(repo_url, branch, checkout)
+        +pull(run_args)
+        +list(run_args)
+        +rm(run_args)
     }
     class ScriptAction {
-        +run(args)
+        +search(i)
+        +rm(i)
+        +dynamic_import_module(script_path)
+        +call_script_module_function(function_name, run_args)
+        +docker(run_args)
+        +run(run_args)
+        +test(run_args)
         +list(args)
     }
     class CacheAction {
-        +show(args)
+        +search(i)
+        +find(i)
+        +rm(i)
+        +show(run_args)
         +list(args)
     }
     class ExperimentAction {
@@ -96,18 +148,32 @@ classDiagram
     }
     class CfgAction {
         +load(args)
-        +unload(args)
-    }
-    class Repo {
-        -path : str
-        -meta : dict
-    }
-    class Automation {
-        -cmind : Action
-        +execute(args)
     }
     class Index {
-        +find()
+        +add(meta, folder_type, path, repo)
+        +get_index(folder_type, uid)
+        +update(meta, folder_type, path, repo)
+        +rm(meta, folder_type, path)
+        +build_index()
+    }
+    class Item {
+        +meta
+        +path
+        +repo
+        +_load_meta()
+    }
+    class Repo {
+        +path
+        +meta
+        +_load_meta()
+    }
+    class Automation {
+        +action_object
+        +automation_type
+        +meta
+        +path
+        +_load_meta()
+        +search(i)
     }
 
     Action <|-- RepoAction
@@ -115,19 +181,14 @@ classDiagram
     Action <|-- CacheAction
     Action <|-- ExperimentAction
     Action <|-- CfgAction
-    Repo "1" *-- Action
-    Automation "1" *-- Action
-
-    class get_action {
-        +actions : dict
-        +get_action(target)
-    }
-
-    main --> get_action
-    get_action --> RepoAction
-    get_action --> ScriptAction
-    get_action --> CacheAction
-    get_action --> ExperimentAction
-    get_action --> CfgAction
+    RepoAction o-- Repo
+    ScriptAction o-- Automation
+    CacheAction o-- Index
+    ExperimentAction o-- Index
+    CfgAction o-- Index
+    Index o-- Repo
+    Index o-- Item
+    Item o-- Repo
+    Automation o-- Action
 ```
 
