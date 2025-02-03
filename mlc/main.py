@@ -33,7 +33,7 @@ class ColoredFormatter(logging.Formatter):
 logger = logging.getLogger(__name__)
 
 # Set up logging configuration
-def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
+def setup_logging(log_path = os.getcwd(),log_file = 'mlc-log.txt'):
     
     logFormatter = ColoredFormatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s')
     logger.setLevel(logging.INFO)
