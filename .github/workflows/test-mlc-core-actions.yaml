@@ -1,0 +1,136 @@
+name: MLC core actions test
+
+on:
+  pull_request:
+    branches: [ "main", "dev" ]
+    paths:
+      - '.github/workflows/test-mlc-core-actions.yml'
+      - '**'
+      - '!**.md'
+
+jobs:
+  test_mlc_core_actions:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.8"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        exclude:
+          - os: windows-latest
+          - os: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Configure git longpaths (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        git config --system core.longpaths true
+
+    - name: Install mlcflow from the pull request's source repository and branch
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --ignore-installed --verbose pip setuptools
+        python -m pip install .
+
+    - name: Test 1 - pull repo - Pull a forked MLOps repository
+      run: |
+        GH_MLC_REPO_PATH_FORK="${HOME}/MLC/repos/anandhu-eng@mlperf-automations"
+        GH_MLC_REPO_JSON_PATH="${HOME}/MLC/repos/repos.json"
+        mlc pull repo anandhu-eng@mlperf-automations  --checkout=dev
+        if [ ! -d "${GH_MLC_REPO_PATH_FORK}" ]; then
+          echo "Repository folder $GH_MLC_REPO_PATH_FORK not found. Exiting with failure."
+          exit 1
+        fi
+        if [ ! -f "$GH_MLC_REPO_JSON_PATH" ]; then
+          echo "File $GH_MLC_REPO_JSON_PATH does not exist. Exiting with failure."
+          exit 1
+        fi
+        if ! grep -q "$GH_MLC_REPO_PATH_FORK" "$GH_MLC_REPO_JSON_PATH"; then
+          echo "Path $GH_MLC_REPO_PATH_FORK not found in $GH_MLC_REPO_JSON_PATH. Exiting with failure."
+          exit 1
+        fi
+        CURRENT_BRANCH=$(git -C "$GH_MLC_REPO_PATH_FORK" rev-parse --abbrev-ref HEAD)
+        if [ "$CURRENT_BRANCH" != "dev" ]; then
+          echo "Expected branch 'dev', but found '$CURRENT_BRANCH'. Exiting with failure."
+          exit 1
+        fi
+
+      
+    - name: Test 2 - pull repo - Test conflicting repo scenario
+      run: |
+        GH_MLC_REPO_PATH="${HOME}/MLC/repos/mlcommons@mlperf-automations"
+        GH_MLC_REPO_JSON_PATH="${HOME}/MLC/repos/repos.json"
+        mlc pull repo mlcommons@mlperf-automations --checkout=dev
+        if [ ! -d "$GH_MLC_REPO_PATH" ]; then
+          echo "Repository folder $GH_MLC_REPO_PATH not found. Exiting with failure."
+          exit 1
+        fi
+        if [ ! -f "$GH_MLC_REPO_JSON_PATH" ]; then
+          echo "File $GH_MLC_REPO_JSON_PATH does not exist. Exiting with failure."
+          exit 1
+        fi
+        if ! grep -q "$GH_MLC_REPO_PATH" "$GH_MLC_REPO_JSON_PATH"; then
+          echo "Path $GH_MLC_REPO_PATH not found in $GH_MLC_REPO_JSON_PATH. Exiting with failure."
+          exit 1
+        fi
+        if ! grep -q "$GH_MLC_REPO_PATH_FORK" "$GH_MLC_REPO_JSON_PATH"; then
+          echo "Path $GH_MLC_REPO_PATH_FORK also found in $GH_MLC_REPO_JSON_PATH. This should have been replaced. Exiting with failure."
+          exit 1
+        fi
+        CURRENT_BRANCH=$(git -C "$GH_MLC_REPO_PATH" rev-parse --abbrev-ref HEAD)
+        if [ "$CURRENT_BRANCH" != "dev" ]; then
+          echo "Expected branch 'dev', but found '$CURRENT_BRANCH'. Exiting with failure."
+          exit 1
+        fi
+    
+    - name: Test 3 - list repo - List the existing repositories
+      run: |
+        mlc list repo
+
+    - name: Test  4 - rm repo - Remove the forked mlperf-automation repo
+      run: |
+        GH_MLC_REPO_PATH_FORK="${HOME}/MLC/repos/anandhu-eng@mlperf-automations"
+        mlc rm repo anandhu-eng@mlperf-automations
+        if [ -d "$GH_MLC_REPO_PATH_FORK" ]; then
+          echo "Repository folder $GH_MLC_REPO_PATH found. It should ideally be deleted. Exiting with failure."
+          exit 1
+        fi
+
+    - name: Test 5 - find cache - Cache not present
+      run: |
+        mlc find cache --tags=detect,os 2>&1 | tee test5.log
+        if ! grep -q "No cache entry found for the specified tags:" test5.log; then
+          exit 1
+        fi
+
+    - name: Test 6 - run script - Output being used for testing mlc cache
+      run: |
+        mlc run script --tags=get,imagenet-aux --quiet
+        mlc run script --tags=get,imagenet-aux,_from.dropbox --quiet
+
+    - name: Test 7 - find cache - More than one cache present
+      run: |
+        mlc search cache --tags=get,imagenet-aux 2>&1 | tee test7.log
+        if grep -q "No cache entry found for the specified tags:" test7.log; then
+          exit 1
+        fi
+      
+    - name: Test 8 - show cache - More than one cache present
+      run: |
+        mlc show cache --tags=get,imagenet-aux 2>&1 | tee test7.log
+
+    - name: Test 9 - rm cache - More than one cache present
+      run: |
+        mlc rm cache --tags=get,imagenet-aux 2>&1 --all | tee test7.log
+
+    - name: Test 10 - cp script - Copy mlc script 
+      run: |
+        mlc cp script detect-os my-os-detect
+        

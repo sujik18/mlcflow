@@ -13,6 +13,7 @@ import mlc.utils as utils
 from pathlib import Path
 from colorama import Fore, Style, init
 import shutil
+
 # Initialize colorama for Windows support
 init(autoreset=True)
 class ColoredFormatter(logging.Formatter):
@@ -29,35 +30,17 @@ class ColoredFormatter(logging.Formatter):
             record.levelname = f"{self.COLORS[record.levelname]}{record.levelname}{Style.RESET_ALL}"
         return super().format(record)
 
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# Create console handler with the custom formatter
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-
-# Remove any existing handlers and add our custom handler
-if logger.hasHandlers():
-    logger.handlers.clear()
-
-logger.addHandler(console_handler)
-
-# # Set up logging configuration
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# logger = logging.getLogger(__name__)
-
 
 # Set up logging configuration
-def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
+def setup_logging(log_path = os.getcwd(),log_file = 'mlc-log.txt'):
     
-    logFormatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logFormatter = ColoredFormatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s')
+    logger.setLevel(logging.INFO)
     
     # File hander for logging in file in the specified path
     file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
-    file_handler.setFormatter(logFormatter)
+    file_handler.setFormatter(logging.Formatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s'))
     logger.addHandler(file_handler)
     
     # Console handler for logging on console
@@ -65,10 +48,6 @@ def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
     consoleHandler.setFormatter(logFormatter)
     logger.addHandler(consoleHandler)
 
-# Testing the log  
-# setup_logging(log_path='.',log_file='mlc-log2.txt')
-# logger = logging.getLogger(__name__)
-# logger.info('This is an info message')
 
 # Base class for CLI actions
 class Action:
@@ -80,6 +59,7 @@ class Action:
     current_repo_path = None
     #mlc = None
     repos = [] #list of Repo objects
+
     def execute(self, args):
         raise NotImplementedError("Subclasses must implement the execute method")
 
@@ -104,9 +84,7 @@ class Action:
         action_target_split = action_target.split(",")
         action_target = action_target_split[0]
 
-        #print(f"action_target = {action_target}")
         action = actions.get(action_target)
-        #logger.info(f"action = {action}")
 
         if action:
             if hasattr(action, action_name):
@@ -262,7 +240,8 @@ class Action:
 
 
     def __init__(self):        
-        self.logger = logging.getLogger()
+        setup_logging(log_path='.',log_file='mlc-log.txt')
+        self.logger = logger
         temp_repo = os.environ.get('MLC_REPOS','').strip()
         if temp_repo == '':
             self.repos_path = os.path.expanduser('~/MLC/repos')
@@ -378,7 +357,7 @@ class Action:
     
     def rm(self, i):
         """
-        Removes an item to the repository.
+        Removes an item from the repository.
 
         Args:
             i (dict): Input dictionary with the following keys:
@@ -424,18 +403,26 @@ class Action:
         if len(res['list']) == 0:
             return {'return': 1, 'error': f'No {target_name} found for {inp}'}
         elif len(res['list']) > 1:
-            return {'return': 1, 'error': f'More than 1 {action_target} found for {inp}: {res["list"]}'}
-        else:
-            result = res['list'][0]
+            logger.info(f"More than 1 {target_name} found for {inp}:")
+            if not i.get('all'):
+                for idx, item in enumerate(res["list"]):
+                    logger.info(f"{idx}. Path: {item.path}, Meta: {item.meta}")
+
+                user_choice = input("Would you like to proceed with all items? (yes/no): ").strip().lower()
+                if user_choice not in ['yes', 'y']:
+                    return {'return': 1, 'error': "Operation aborted by user."}
+        results = res['list']
+        
+        for result in results:
             item_path = result.path
             item_meta = result.meta
         
         
-        if os.path.exists(item_path):
-            shutil.rmtree(item_path)
-            logger.info(f"{target_name} item: {item_path} has been successfully removed")
+            if os.path.exists(item_path):
+                shutil.rmtree(item_path)
+                logger.info(f"{target_name} item: {item_path} has been successfully removed")
 
-        self.index.rm(item_meta, target_name, item_path)
+            self.index.rm(item_meta, target_name, item_path)
         
         return {
             "return": 0,
@@ -629,7 +616,7 @@ class Action:
 
         if res['return'] > 0:
             return res
-        logging.info(f"{action_target} {src_item_path} copied to {target_item_path}")
+        logger.info(f"{action_target} {src_item_path} copied to {target_item_path}")
 
         return {'return': 0}
 
@@ -637,7 +624,7 @@ class Action:
         try:
             # Copy the source folder to the destination
             shutil.copytree(source_path, destination_path)
-            logging.info(f"Folder successfully copied from {source_path} to {destination_path}")
+            logger.info(f"Folder successfully copied from {source_path} to {destination_path}")
         except FileExistsError:
             return {'return': 1, 'error': f"Destination folder {destination_path} already exists."}
         except FileNotFoundError:
@@ -689,6 +676,7 @@ class Action:
         return {'return': 0, 'list': result}
 
 
+
 class Index:
     def __init__(self, repos_path, repos):
         """
@@ -701,7 +689,7 @@ class Index:
         self.repos = repos
         #logger.info(repos)
 
-        logger.info(f"Repos path for Index: {self.repos_path}")
+        logger.debug(f"Repos path for Index: {self.repos_path}")
         self.index_files = {
             "script": os.path.join(repos_path, "index_script.json"),
             "cache": os.path.join(repos_path, "index_cache.json"),
@@ -844,7 +832,7 @@ class Index:
             try:
                 with open(output_file, "w") as f:
                     json.dump(index_data, f, indent=4, cls=CustomJSONEncoder)
-                logger.info(f"Shared index for {folder_type} saved to {output_file}.")
+                logger.debug(f"Shared index for {folder_type} saved to {output_file}.")
             except Exception as e:
                 logger.error(f"Error saving shared index for {folder_type}: {e}")
 
@@ -925,8 +913,6 @@ class Automation:
             logger.info(f"No meta file found in {self.path}")
 
     def search(self, i):
-        #logger.info(i)
-        #logger.info(self)
         indices = self.action_object.index.indices
         target_index = indices.get(self.automation_type)
         result = []
@@ -940,9 +926,6 @@ class Automation:
                 if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
                     it = Item(res['path'], res['repo'])
                     result.append(it)
-            #logger.info(f"p_tags={p_tags}")
-            #logger.info(f"n_tags={n_tags}")
-            #for key in indices:
         #logger.info(result)
         return {'return': 0, 'list': result}
         #indices
@@ -1121,16 +1104,23 @@ class RepoAction(Action):
         
 
 class ScriptAction(Action):
+    parent = None
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        self.parent = parent
+        self.__dict__.update(vars(parent))
+
     def search(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
-        return super().search(i)
+        return self.parent.search(i)
 
     def rm(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
         logger.debug(f"Removing script with input: {i}")
-        return super().rm(i)
+        return self.parent.rm(i)
 
     def dynamic_import_module(self, script_path):
         # Validate the script_path
@@ -1182,10 +1172,11 @@ class ScriptAction(Action):
             
             if result['return'] > 0:
                 error = result.get('error', "")
-                raise ScriptExecutionError(f"Script docker execution failed. Error : {error}")
+                raise ScriptExecutionError(f"Script {function_name} execution failed. Error : {error}")
             return result
         else:
             logger.info("ScriptAutomation class not found in the script.")
+            return {'return': 1, 'error': 'ScriptAutomation class not found in the script.'}
 
     def docker(self, run_args):
         return self.call_script_module_function("docker", run_args)
@@ -1206,32 +1197,70 @@ class ScriptExecutionError(Exception):
     pass
 
 class CacheAction(Action):
+
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
     
     def search(self, i):
         i['target_name'] = "cache"
-        logger.debug(f"Searching for cache with input: {i}")
-        return super().search(i)
+        #logger.debug(f"Searching for cache with input: {i}")
+        return self.parent.search(i)
+    find = search
 
     def rm(self, i):
         i['target_name'] = "cache"
-        logger.debug(f"Removing cache with input: {i}")
-        return super().rm(i)
+        #logger.debug(f"Removing cache with input: {i}")
+        return self.parent.rm(i)
 
     def show(self, run_args):
         self.action_type = "cache"
-        logger.info(f"Showing cache with identifier: {args.details}")
-        run_args['target_name'] = "cache"
-        return self.search(run_args)
+        res = self.search(run_args)
+        logger.info(f"Showing cache with tags: {run_args.get('tags')}")
+        cached_meta_keys_to_show = ["uid", "tags", "dependent_cached_path", "associated_script_item"]
+        cached_state_keys_to_show = ["new_env", "new_state", "version"]
+        for item in res['list']:
+            print(f"""Location: {item.path}:
+Cache Meta:""")
+            for key in cached_meta_keys_to_show:
+                if key in item.meta:
+                    print(f"""    {key}: {item.meta[key]}""")
+            print("""Cached State:""")
+            cached_state_meta_file = os.path.join(item.path, "mlc-cached-state.json")
+            try:
+                # Load and parse the JSON file containing the cached state
+                with open(cached_state_meta_file, 'r') as file:
+                    meta = json.load(file)
+                    for key in cached_state_keys_to_show:
+                        if key in meta:
+                            print(f"""    {key}:""", end="")
+                            if meta[key] and isinstance(meta[key], dict):
+                                print("")
+                                utils.printd(meta[key], yaml=False, sort_keys=True, begin_spaces=8)
+                            else:
+                                print(f""" {meta[key]}""")
+            except json.JSONDecodeError as e:
+                logger.error(f"Error decoding JSON: {e}")
+            print("......................................................")
+            print("")
+            
+        return {'return': 0}
 
     def list(self, args):
         logger.info("Listing all caches.")
+        return {'return': 0}
 
 class ExperimentAction(Action):
     def show(self, args):
         logger.info(f"Showing experiment with identifier: {args.details}")
+        return {'return': 0}
 
     def list(self, args):
         logger.info("Listing all experiments.")
+        return {'return': 0}
 
 
 class CfgAction(Action):
@@ -1264,18 +1293,6 @@ class CfgAction(Action):
         
         return {'return': 0, 'config': self.cfg}
 
-    def unload(self, args):
-        """
-        Unload the configuration.
-        
-        Args:
-            args (dict): Optional, could be used to specify a particular configuration to unload.
-        """
-        if hasattr(self, 'config'):
-            logger.info(f"Unloading configuration.")
-            del self.config  # Remove the loaded config from memory
-        else:
-            logger.error("Error: No configuration is currently loaded.")
 
 actions = {
         'repo': RepoAction,
@@ -1309,6 +1326,21 @@ def mlcr():
     # Call the main function
     main()
 
+default_parent = None
+
+if default_parent is None:
+    default_parent = Action()
+
+def process_console_output(res, target, action, run_args):
+    if action == "find":
+        if len(res['list']) == 0:
+            logger.warn(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
+        else:
+            for item in res['list']:
+                logger.info(f"""Item path: {item.path}""")
+
+
+
 # Main CLI function
 def main():
     parser = argparse.ArgumentParser(prog='mlc', description='A CLI tool for managing repos, scripts, and caches.')
@@ -1326,7 +1358,7 @@ def main():
         pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script and Cache-specific subcommands
-    for action in ['run', 'test', 'show', 'update', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
+    for action in ['run', 'test', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
@@ -1359,6 +1391,14 @@ def main():
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
 
+
+    if args.command in ['rm']:
+        if args.target == "repo":
+            run_args['repo'] = args.details
+  
+    if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
+        run_args['tags'] = args.details
+
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
         if hasattr(args, 'details') and args.details:
@@ -1374,10 +1414,10 @@ def main():
         res = method(run_args)
         if res['return'] > 0:
             logger.error(res.get('error', f"Error in {action}"))
+        process_console_output(res, args.target, args.command, run_args)
     else:
         logger.info(f"Error: '{args.command}' is not supported for {args.target}.")
 
 if __name__ == '__main__':
     main()
 
-#__version__ = "0.0.1"

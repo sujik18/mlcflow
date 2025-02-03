@@ -28,14 +28,10 @@ Once your contribution exceeds 50 lines of code (in total), we will:
 
 ## Current Contributors
 
-- **[Arjun Suresh]** - *Initial Development*  
-- **[Anandhu Sooraj]** - *Initial Development*  
-- **[Shaik Masthan]** - *Initial Development*  
-- **[Sahil Avaran]** - *Initial Development*, added logging  
-- **[Ayushi Chaudhari]** - *Initial Development*  
-- **[Contributor 1]** - Added core features for CLI workflow.  
-- **[Contributor 2]** - Refactored caching system and enhanced performance.  
-- **[Contributor 3]** - Improved documentation and code structure.  
+- **[Arjun Suresh]** - *Initial Development Discussions, {Script,Cache} Action implementations*  
+- **[Anandhu Sooraj]** - *Initial Development Discussions, RepoAction implmentation, Github Tests*  
+- **[Shaik Masthan]** - *Initial Development Discussions*  
+- **[Sahil Avaran]** - *Initial Development Discussions*, added logging  
 - **[Your Name Here]** - This could be you! 🎉  
 
 ---
