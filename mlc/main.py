@@ -35,19 +35,21 @@ logger = logging.getLogger(__name__)
 # Set up logging configuration
 def setup_logging(log_path = os.getcwd(),log_file = 'mlc-log.txt'):
     
-    logFormatter = ColoredFormatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s')
-    logger.setLevel(logging.INFO)
+    if not logger.hasHandlers():
+        logFormatter = ColoredFormatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s')
+        logger.setLevel(logging.INFO)
+   
+
+        # File hander for logging in file in the specified path
+        file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
+        file_handler.setFormatter(logging.Formatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s'))
+        logger.addHandler(file_handler)
     
-    # File hander for logging in file in the specified path
-    file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
-    file_handler.setFormatter(logging.Formatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s'))
-    logger.addHandler(file_handler)
-    
-    # Console handler for logging on console
-    consoleHandler = logging.StreamHandler()
-    consoleHandler.setFormatter(logFormatter)
-    logger.addHandler(consoleHandler)
-    logger.propagate = False
+        # Console handler for logging on console
+        consoleHandler = logging.StreamHandler()
+        consoleHandler.setFormatter(logFormatter)
+        logger.addHandler(consoleHandler)
+        logger.propagate = False
 
 
 # Base class for CLI actions
@@ -241,11 +243,13 @@ class Action:
 
 
     def __init__(self):        
-        setup_logging(log_path='.',log_file='mlc-log.txt')
+        setup_logging(log_path=os.getcwd(),log_file='mlc-log.txt')
         self.logger = logger
+
+        print(logger.handlers)
         temp_repo = os.environ.get('MLC_REPOS','').strip()
         if temp_repo == '':
-            self.repos_path = os.path.expanduser('~/MLC/repos')
+            self.repos_path = os.path.join(os.path.expanduser("~"), "MLC", "repos")
         else:
             self.repos_path = temp_repo
 
@@ -936,6 +940,13 @@ class Automation:
 # Extends Action class
 class RepoAction(Action):
 
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
+
     def find(self, run_args):
         repo = run_args.get('item', run_args.get('artifact'))
         repo_split = repo.split(",")
@@ -1231,6 +1242,8 @@ Cache Meta:""")
                     print(f"""    {key}: {item.meta[key]}""")
             print("""Cached State:""")
             cached_state_meta_file = os.path.join(item.path, "mlc-cached-state.json")
+            if not os.path.exists(cached_state_meta_file):
+                continue
             try:
                 # Load and parse the JSON file containing the cached state
                 with open(cached_state_meta_file, 'r') as file:
@@ -1255,6 +1268,13 @@ Cache Meta:""")
         return {'return': 0}
 
 class ExperimentAction(Action):
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
+
     def show(self, args):
         logger.info(f"Showing experiment with identifier: {args.details}")
         return {'return': 0}
@@ -1265,6 +1285,13 @@ class ExperimentAction(Action):
 
 
 class CfgAction(Action):
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
+
     def load(self, args):
         """
         Load the configuration.
