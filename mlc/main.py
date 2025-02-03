@@ -47,6 +47,7 @@ def setup_logging(log_path = 'mlc',log_file = 'mlc-log.txt'):
     consoleHandler = logging.StreamHandler()
     consoleHandler.setFormatter(logFormatter)
     logger.addHandler(consoleHandler)
+    logger.propagate = False
 
 
 # Base class for CLI actions
