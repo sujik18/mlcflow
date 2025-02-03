@@ -246,7 +246,6 @@ class Action:
         setup_logging(log_path=os.getcwd(),log_file='mlc-log.txt')
         self.logger = logger
 
-        print(logger.handlers)
         temp_repo = os.environ.get('MLC_REPOS','').strip()
         if temp_repo == '':
             self.repos_path = os.path.join(os.path.expanduser("~"), "MLC", "repos")
