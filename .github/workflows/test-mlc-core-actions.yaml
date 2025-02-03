@@ -118,7 +118,19 @@ jobs:
     - name: Test 7 - find cache - More than one cache present
       run: |
         mlc search cache --tags=get,imagenet-aux 2>&1 | tee test7.log
-        mlc search cache --tags=detect,os 2>&1 | tee test5.log
-        if grep -q "No cache entry found for the specified tags:" test5.log; then
+        if grep -q "No cache entry found for the specified tags:" test7.log; then
           exit 1
         fi
+      
+    - name: Test 8 - show cache - More than one cache present
+      run: |
+        mlc show cache --tags=get,imagenet-aux 2>&1 | tee test7.log
+
+    - name: Test 9 - rm cache - More than one cache present
+      run: |
+        mlc rm cache --tags=get,imagenet-aux 2>&1 --all | tee test7.log
+
+    - name: Test 10 - cp script - Copy mlc script 
+      run: |
+        mlc cp script detect-os my-os-detect
+        
