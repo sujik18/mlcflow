@@ -405,7 +405,7 @@ class Action:
         res = self.search(inp)
 
         if len(res['list']) == 0:
-            return {'return': 1, 'error': f'No {target_name} found for {inp}'}
+            return {'return': 16, 'error': f'No {target_name} found for {inp}'}
         elif len(res['list']) > 1:
             logger.info(f"More than 1 {target_name} found for {inp}:")
             if not i.get('all'):
