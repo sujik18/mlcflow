@@ -174,7 +174,6 @@ class Action:
                 self.local_repo = (meta['alias'], meta['uid'])
             # Create a Repo object and add it to the list
             repos_list.append(Repo(path=repo_path, meta=meta))
-
         return repos_list
 
     def load_repos(self):
@@ -947,20 +946,90 @@ class RepoAction(Action):
         self.__dict__.update(vars(parent))
 
     def find(self, run_args):
-        repo = run_args.get('item', run_args.get('artifact'))
-        repo_split = repo.split(",")
-        if len(repo_split) > 1:
-            repo_uid = repo_split[1]
-        repo_name = repo_split[0]
+        try:
+            # Load repos.json file
+            repos_file= os.path.join(self.repos_path, 'repos.json')
+            with open(repos_file, "r") as f:
+                repos_list = json.load(f)
+            if(run_args.get('item', run_args.get('artifact'))):
+                repo = run_args.get('item', run_args.get('artifact'))
+            else:
+                repo = run_args.get('repo', run_args.get('item', run_args.get('artifact')))
 
-        lst = []
-        for i in self.repos:
-            if repo_uid and i.meta['uid'] == repo_uid:
-                lst.append(i)
-            elif repo_name == i.meta['alias']:
-                lst.append(i)
-                
-        return {'return': 0, 'list': lst}
+                # Check if repo is None or empty
+            if not repo:
+                raise ValueError(
+                        "Please enter a Repo Alias, Repo UID, or Repo URL in one of the following formats:\n"
+                        "- <repo_owner>@<repos_name>\n"
+                        "- <repo_url>\n"
+                        "- <repo_uid>\n"
+                        "- <repo_alias>\n"
+                        "- <repo_alias>,<repo_uid>"
+    )
+
+            # Handle the different repo input formats
+            repo_name = None
+            repo_uid = None
+
+            # Check if the repo is in the format of a repo UID (alphanumeric string)
+            if repo.isalnum():  # Assuming repo_uid is alphanumeric
+                repo_uid = repo
+            if "," in repo:
+                repo_split = repo.split(",")
+                repo_name = repo_split[0]
+                if len(repo_split) > 1:
+                    repo_uid = repo_split[1]
+            elif "@" in repo:
+                repo_name = repo
+            elif re.match(r"(?:https?://)?(?:www\.)?github\.com/([^/]+)/([^/.]+)(?:\.git)?", repo):
+                # Convert GitHub URL to user@repo_name format if necessary
+                pattern = r"(?:https?://)?(?:www\.)?github\.com/([^/]+)/([^/.]+)(?:\.git)?"
+                match = re.match(pattern, repo)
+                if match:
+                    user, repo_name = match.groups()
+                    repo_name = f"{user}@{repo_name}"
+                else:
+                    raise ValueError(f"Invalid GitHub URL format for: {repo}")
+            else:
+                # If URL is malformed, handle it separately
+                if "github.com" in repo and not re.match(r"(https?://)?(?:www\.)?github\.com/([^/]+)/([^/.]+)(?:\.git)?", repo):
+                    raise ValueError(f"Invalid GitHub URL format for: {repo}")
+            
+            # Check if repo_name exists in repos.json
+            matched_repo_path = None
+            repo_found = False  # Flag to track if any repo is found
+            for repo_path in repos_list:
+                if repo_name and repo_name == os.path.basename(repo_path):
+                    meta_yaml_path = os.path.join(repo_path, "meta.yaml")
+                    if os.path.exists(meta_yaml_path):
+                        matched_repo_path = repo_path
+                        repo_found = True  # Repo found
+                        break  # Stop searching if we find a match
+                    else:
+                        raise ValueError(f"Repository with alias: '{repo_name}' is missing meta.yaml file")
+
+            # Search through self.repos for matching repos
+            lst = []
+            for i in self.repos:
+                if repo_uid and i.meta['uid'] == repo_uid:
+                    lst.append(i)
+                elif repo_name == i.meta['alias']:
+                    lst.append(i)
+                elif repo.isalnum() and not any(i.meta['uid'] == repo_uid for i in self.repos):
+                    raise ValueError(f"No repository with UID: '{repo_uid}' was found")
+                elif not matched_repo_path and not any(i.meta['alias'] == repo_name for i in self.repos) and not any(i.meta['uid'] == repo_uid for i in self.repos ):
+                    raise ValueError(f"No repository with alias: '{repo_name}' was found")
+                elif "," in repo and not matched_repo_path and not any(i.meta['uid'] == repo_uid for i in self.repos) and not any(i.meta['alias'] == repo_name for i in self.repos):
+                    raise ValueError(f"No repository with alias: '{repo_name}' and UID: '{repo_uid}' was found")
+
+
+            # Append the matched repo path
+            lst.append(matched_repo_path)
+            
+            return {'return': 0, 'list': lst}
+        except Exception as e:
+            # Return error message if any exception occurs
+            return {"return": 1, "error": str(e)}
 
     def github_url_to_user_repo_format(self, url):
         """
@@ -1360,11 +1429,22 @@ if default_parent is None:
 
 def process_console_output(res, target, action, run_args):
     if action == "find":
+        if "list" not in res:
+            return  # Exit function if there's an error
         if len(res['list']) == 0:
             logger.warn(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
         else:
-            for item in res['list']:
-                logger.info(f"""Item path: {item.path}""")
+            seen_paths = set()  # To avoid duplicate logging
+            for item in res["list"]:
+                if isinstance(item, str):  # If item is a string (repo path)
+                    if item not in seen_paths:
+                        logger.info(f"""Item path: {item}""")
+                        seen_paths.add(item)
+
+                elif hasattr(item, "path"):  # If item has `.path` attribute
+                    if item.path not in seen_paths:
+                        logger.info(f"""Item path: {item.path}""")
+                        seen_paths.add(item.path)
 
 
 
@@ -1419,7 +1499,7 @@ def main():
         run_args['repo'] = args.repo
 
 
-    if args.command in ['rm']:
+    if args.command in ['rm','find']:
         if args.target == "repo":
             run_args['repo'] = args.details
   
