@@ -947,10 +947,8 @@ class RepoAction(Action):
 
     def find(self, run_args):
         try:
-            # Load repos.json file
-            repos_file= os.path.join(self.repos_path, 'repos.json')
-            with open(repos_file, "r") as f:
-                repos_list = json.load(f)
+            # Get repos_list using the existing method
+            repos_list = self.load_repos_and_meta()
             if(run_args.get('item', run_args.get('artifact'))):
                 repo = run_args.get('item', run_args.get('artifact'))
             else:
@@ -997,16 +995,10 @@ class RepoAction(Action):
             
             # Check if repo_name exists in repos.json
             matched_repo_path = None
-            repo_found = False  # Flag to track if any repo is found
-            for repo_path in repos_list:
-                if repo_name and repo_name == os.path.basename(repo_path):
-                    meta_yaml_path = os.path.join(repo_path, "meta.yaml")
-                    if os.path.exists(meta_yaml_path):
-                        matched_repo_path = repo_path
-                        repo_found = True  # Repo found
-                        break  # Stop searching if we find a match
-                    else:
-                        raise ValueError(f"Repository with alias: '{repo_name}' is missing meta.yaml file")
+            for repo_obj in repos_list:
+                if repo_name and repo_name == os.path.basename(repo_obj.path) :
+                    matched_repo_path = repo_obj.path
+                    break
 
             # Search through self.repos for matching repos
             lst = []
