@@ -147,6 +147,10 @@ class Action:
 
         # Iterate through the list of repository paths
         for repo_path in repo_paths:
+            if not os.path.exists(repo_path):
+                logger.warning(f"""Warning: {repo_path} not found. Consider doing `mlc rm repo {repo_path}`. Skipping...""")
+                continue
+
             if is_curdir_inside_path(repo_path):
                 self.current_repo_path = repo_path
             repo_path = repo_path.strip()  # Remove any extra whitespace or newlines
