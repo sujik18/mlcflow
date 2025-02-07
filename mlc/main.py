@@ -937,7 +937,7 @@ class RepoAction(Action):
         logger.info(f"""New repo path: {repo_path}""")
 
         #check if it has MLC meta
-        meta_file = os.path.join(i_repo_path, "meta.yaml")
+        meta_file = os.path.join(repo_path, "meta.yaml")
         if not os.path.exists(meta_file):
             meta = {}
             meta['uid'] = utils.get_new_uid()['uid']
