@@ -133,4 +133,10 @@ jobs:
     - name: Test 10 - cp script - Copy mlc script 
       run: |
         mlc cp script detect-os my-os-detect
+
+    - name: Test 11 - add repo - Add a new MLC repo 
+      run: |
+        mlc add repo my-new-repo
+        mlc add repo https://github.com/mlcommons/inference
+        mlc add repo https://mygit.com/myrepo
         
