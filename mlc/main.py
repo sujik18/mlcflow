@@ -923,7 +923,7 @@ class RepoAction(Action):
 
         if not os.path.exists(i_repo_path):
             #check if its an URL
-            if is_valid_url(i_repo_path):
+            if utils.is_valid_url(i_repo_path):
                 if "github.com" in i_repo_path:
                     res = self.github_url_to_user_repo_format(i_repo_path)
                     if res['return'] > 0:
