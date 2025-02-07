@@ -1430,16 +1430,8 @@ def main():
     # The chosen subcommand will be stored in the "command" attribute of the parsed arguments.
     subparsers = parser.add_subparsers(dest='command', required=True)
 
-    for action in ['pull']:
-        # Pull parser - handles repo URLs directly
-        # The chosen subcommand will be stored in the "pull" attribute of the parsed arguments.
-        pull_parser = subparsers.add_parser('pull', help='Pull a repository by URL or target.')
-        pull_parser.add_argument('target', choices=['repo'], help='Target type (repo).')
-        pull_parser.add_argument('repo', nargs='?', help='Repo to pull in URL format or owner@repo_name format for github repos')
-        pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
-
     # Script and Cache-specific subcommands
-    for action in ['run', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
+    for action in ['run', 'pull', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
@@ -1473,7 +1465,7 @@ def main():
         run_args['repo'] = args.repo
 
 
-    if args.command in ['rm', 'add', 'pull']:
+    if args.command in ['pull', 'rm', 'add']:
         if args.target == "repo":
             run_args['repo'] = args.details
   
