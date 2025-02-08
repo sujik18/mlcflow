@@ -559,17 +559,20 @@ class Action:
         choice = 0
         if len(res['list']) == 0:
             return {'return': 1, 'error': f'No {action_target} found for {src_item}'}
-        elif len(res['list']) > 1 and not i.get("quiet"):
+        elif len(res['list']) > 1 and not run_args.get("quiet"):
             print(f"More than one {action_target} found for {src_item}:")
 
             # Display available options
             for idx, item in enumerate(res['list'], start=1):
-                print(f"{idx}. {item}")
+                print(f"{idx}. {item.path}")
 
             # Ask user to choose an item
             while True:
+                choice = input("Select the correct one (enter number, default=1): ").strip()
+                if choice == "":
+                    choice = 1
                 try:
-                    choice = int(input("Select the correct one (enter number): ")) - 1
+                    choice = int(choice) - 1
                     if 0 <= choice < len(res['list']):
                         break
                     else:
@@ -605,7 +608,7 @@ class Action:
             return res
 
         ii = {}
-        ii['meta'] = result.meta
+        ii['meta'] = result.meta.copy()
         if action_target == "script":
             ii['yaml'] = True
 
@@ -624,11 +627,13 @@ class Action:
 
         res = self.save_new_meta(ii, item_id, target_item_name, action_target, target_item_path, target_repo)
 
+        dest_item = Item(target_item_path, target_repo)
+        
         if res['return'] > 0:
             return res
         logger.info(f"{action_target} {src_item_path} copied to {target_item_path}")
 
-        return {'return': 0}
+        return {'return': 0, 'src': result, 'dest': dest_item}
 
     def copy_item(self, source_path, destination_path):
         try:
@@ -644,6 +649,27 @@ class Action:
 
         return {'return': 0}
 
+    def mv(self, run_args):
+        target_name = run_args['target']
+        res = self.cp(run_args)
+        if res['return'] > 0:
+            return res
+        src = res['src']
+        dest = res['dest']
+        ii = {}
+        ii['item'] = src.meta['uid']
+        res = self.rm(ii)
+        if res['return'] > 0:
+            return res
+        
+        #Put the src uid to the destination path
+        dest.meta['uid'] = src.meta['uid']
+        dest._save_meta()
+        self.index.update(dest.meta, target_name, dest.path, dest.repo)
+        logger.info(f"""Item with uid {dest.meta['uid']} successfully moved from {src.path} to {dest.path}""")
+
+        return {'return': 0, 'src': src, 'dest': dest}
+
     def search(self, i):
         indices = self.index.indices
         target = i.get('target_name', self.action_type)
@@ -651,12 +677,44 @@ class Action:
         result = []
         uid = i.get("uid")
         alias = i.get("alias")
+        item_repo = i.get('item_repo')
+        if not uid and not alias and i.get('details'):
+            details = i['details']
+            details_split = details.split(",")
+            if len(details_split) > 1:
+                alias = details_split[0]
+                uid = details_split[1]
+            else:
+                if self.is_uid(details_split[0]):
+                    uid = details_split[0]
+                else:
+                    alias = details_split[0]
+
+        if ":" in alias:
+            alias_split = alias.split(":")
+            alias = alias_split[1]
+            item_repo = alias_split[0]
         folder_name = i.get("folder_name")
         found = False
+
+        if item_repo:
+            res = self.access(
+                {
+                    "action": "find",
+                    "target": "repo",
+                    "repo": f"{item_repo}"    
+                }
+            )
+            if res["return"] > 0:
+                return res
+            if len(res['list']) == 0:
+                return {'return': 1, 'error': f"""No repo found for {item_repo}"""}
+            item_repo = res['list'][0]
+
         if target_index:
             if uid or alias:
                 for res in target_index:
-                    if res["uid"] == uid or (alias and res["alias"] == alias):
+                    if (res["uid"] == uid or (alias and res["alias"] == alias)) and (not item_repo or item_repo == res['repo']):
                         it = Item(res['path'], res['repo'])
                         result.append(it)
                         found = True
@@ -666,7 +724,7 @@ class Action:
                             it = Item(res['path'], res['repo'])
                             #result.append(it)
             else:
-                tags= i.get("tags")
+                tags = i.get("tags")
                 tags_split = tags.split(",")
                 if target == "script":
                     non_variation_tags = [t for t in tags_split if not t.startswith("_")]
@@ -876,6 +934,15 @@ class Item:
             self.meta = utils.read_json(json_file)
         else:
             logger.info(f"No meta file found in {self.path} for {self.meta}")
+
+    def _save_meta(self):
+        yaml_file = os.path.join(self.path, "meta.yaml")
+        json_file = os.path.join(self.path, "meta.json")
+
+        if os.path.exists(yaml_file):
+            utils.save_yaml(yaml_file, self.meta)
+        elif os.path.exists(json_file):
+            utils.save_json(json_file, self.meta)
 
 
 class Repo:
@@ -1311,6 +1378,7 @@ Main Script Meta:""")
             print("")
             
         return {'return': 0}
+
     def add(self, i):
         """
         Adds a new script to the repository.
@@ -1582,7 +1650,7 @@ def process_console_output(res, target, action, run_args):
             logger.error("'list' entry not found in find result")
             return  # Exit function if there's an error
         if len(res['list']) == 0:
-            logger.warning(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
+            logger.warning(f"""No {target} entry found for the specified input: {run_args}!""")
         else:
             for item in res['list']:
                 logger.info(f"""Item path: {item.path}""")
