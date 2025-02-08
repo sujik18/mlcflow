@@ -173,3 +173,8 @@ jobs:
         mlc find script detect-os,863735b7db8c44fc
         mlc find script detect-os
 
+    - name: Test 17 - rm script
+      run: |
+        mlc rm script detect-os
+        mlc rm script --tags=detect,cpu
+    
