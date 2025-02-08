@@ -353,7 +353,7 @@ class Action:
         """
 
         # Parse item details
-        item = i.get("item",i.get('artifact'))
+        item = i.get("item",i.get('artifact', i.get('details')))
         item_name, item_id, item_tags = (None, None, None)
         if item:
             item_parts = item.split(",")
@@ -380,6 +380,8 @@ class Action:
         target_name = i.get('target_name', self.action_type)
         inp['target_name'] = target_name
         res = self.search(inp)
+        if res['return'] > 0:
+            return res
 
         if len(res['list']) == 0:
             return {'return': 16, 'error': f'No {target_name} found for {inp}'}
@@ -1713,6 +1715,7 @@ def main():
         res = method(run_args)
         if res['return'] > 0:
             logger.error(res.get('error', f"Error in {action}"))
+            raise Exception(f"""An error occurred {res}""")
         process_console_output(res, args.target, args.command, run_args)
     else:
         logger.info(f"Error: '{args.command}' is not supported for {args.target}.")
