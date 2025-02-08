@@ -89,6 +89,7 @@ jobs:
           echo "Expected branch 'dev', but found '$CURRENT_BRANCH'. Exiting with failure."
           exit 1
         fi
+        mlc pull repo
     
     - name: Test 3 - list repo - List the existing repositories
       run: |
