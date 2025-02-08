@@ -267,6 +267,7 @@ class Action:
 
         # Parse item details
         item = i.get("item")
+
         item_name, item_id = (None, None)
         if item:
             item_parts = item.split(",")
@@ -286,7 +287,7 @@ class Action:
             {
                 "automation": "repo",
                 "action": "find",
-                "item": f"{item_repo[0]},{item_repo[1]}",
+                "item": f"{item_repo}",
             }
         )
         if res["return"] > 0:
@@ -308,9 +309,11 @@ class Action:
 
         item_path = os.path.join(target_path, folder_name)
 
+        if os.path.exists(item_path):
+            return {"return": 1, "error": f"""Item exists at {item_path}"""}
+
         # Create item directory if it does not exist
-        if not os.path.exists(item_path):
-            os.makedirs(item_path)
+        os.makedirs(item_path)
 
         res = self.save_new_meta(i, item_id, item_name, target_name, item_path, repo)
         if res['return'] > 0:
@@ -332,7 +335,6 @@ class Action:
                 - item_repo (tuple): Repository alias and UID (default: local repo).
                 - item (str): Item alias and optional UID in "alias,uid" format.
                 - tags (str): Comma-separated tags.
-                - new_tags (str): Additional comma-separated tags to add.
                 - yaml (bool): Whether to save metadata in YAML format. Defaults to JSON.
 
         Returns:
@@ -406,8 +408,9 @@ class Action:
         })
 
         # Process tags
-        tags = i.get("tags", "").split(",") if i.get("tags") else []
+        tags = i.get("tags", "").split(",") if i.get("tags") else item_meta.get("tags", [])
         new_tags = i.get("new_tags", "").split(",") if i.get("new_tags") else []
+
         item_meta["tags"] = list(set(tags + new_tags))  # Ensure unique tags
 
         # Save metadata
@@ -514,34 +517,61 @@ class Action:
 
     def cp(self, run_args):
         action_target = run_args['target']
-        src_item = run_args['src']
-        target_item = run_args['dest']
-        src_split = src_item.split(":")
-        target_split = target_item.split(":")
-        if len(src_split) > 1:
-            src_repo = src_split[0].strip()
-            src_item = src_split[1].strip()
-        else:
-            src_item = src_split[0].strip()
 
         inp = {}
-        inp['alias'] = src_item
-        inp['folder_name'] = src_item #we dont know if the user gave the alias or the folder name, we first check for alias and then the folder name
-        if self.is_uid(src_item):
-            inp['uid'] = src_item
+        src_item = run_args.get('src')
+        src_tags = None
+        if src_item:
+            src_split = src_item.split(":")
+            if len(src_split) > 1:
+                src_repo = src_split[0].strip()
+                src_item = src_split[1].strip()
+            else:
+                src_item = src_split[0].strip()
+            inp['alias'] = src_item
+            inp['folder_name'] = src_item #we dont know if the user gave the alias or the folder name, we first check for alias and then the folder name
+        
+            if self.is_uid(src_item):
+                inp['uid'] = src_item
+
+        else:
+            #src_tags must be there
+            if not run_args.get("src_tags"):
+                return {'return': 1, 'error': 'Either "src" or "src_tags" must be provided as an input for cp method'}
+            src_tags = run_args['src_tags']
+            inp['tags'] = src_tags
 
         inp['target_name'] = action_target
+
         res = self.search(inp)
 
+        choice = 0
         if len(res['list']) == 0:
             return {'return': 1, 'error': f'No {action_target} found for {src_item}'}
-        elif len(res['list']) > 1:
-            return {'return': 1, 'error': f'More than 1 {action_target} found for {src_item}: {res["list"]}'}
-        else:
-            result = res['list'][0]
-            src_item_path = result.path
-            src_item_meta = result.meta
+        elif len(res['list']) > 1 and not i.get("quiet"):
+            print(f"More than one {action_target} found for {src_item}:")
 
+            # Display available options
+            for idx, item in enumerate(res['list'], start=1):
+                print(f"{idx}. {item}")
+
+            # Ask user to choose an item
+            while True:
+                try:
+                    choice = int(input("Select the correct one (enter number): ")) - 1
+                    if 0 <= choice < len(res['list']):
+                        break
+                    else:
+                        print("Invalid selection. Please enter a number from the list.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+
+        result = res['list'][choice]
+        src_item_path = result.path
+        src_item_meta = result.meta
+
+        target_item = run_args['dest']
+        target_split = target_item.split(":")
 
         if len(target_split) > 1:
             target_repo = target_split[0].strip()
@@ -1176,7 +1206,7 @@ class RepoAction(Action):
 
     def pull(self, run_args):
         repo_url = run_args.get('repo', run_args.get('url', 'repo'))
-        if repo_url == "repo":
+        if not repo_url or repo_url == "repo":
             for repo_object in self.repos:
                 repo_folder_name = os.path.basename(repo_object.path)
                 if "@" in repo_folder_name:
@@ -1277,14 +1307,13 @@ class ScriptAction(Action):
         else:
             item_repo = i.get("item_repo", self.local_repo)
 
-        i['item_repo'] = item_repo
-        i['item'] = item
-        i['target_name'] = "script"
-        i['yaml'] = True
-        res = self.parent.add(i)
-        if res['return'] > 0:
-            return res
-        #Todo post processing to update the script meta
+        ii = {}
+        ii['target'] = "script"
+        ii['src_tags'] = i.get("template_tags", "template,generic")
+        ii['dest'] = f"""{item_repo}:{item}"""
+        ii['tags'] = i.get('tags', [])
+        res =  self.cp(ii)
+
         return res
 
     def dynamic_import_module(self, script_path):
@@ -1515,6 +1544,7 @@ if default_parent is None:
 def process_console_output(res, target, action, run_args):
     if action == "find":
         if "list" not in res:
+            logger.error("'list' entry not found in find result")
             return  # Exit function if there's an error
         if len(res['list']) == 0:
             logger.warn(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
