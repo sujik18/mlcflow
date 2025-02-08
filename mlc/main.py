@@ -1388,7 +1388,6 @@ Main Script Meta:""")
                 - item_repo (tuple): Repository alias and UID (default: local repo).
                 - item (str): Item alias and optional UID in "alias,uid" format.
                 - tags (str): Comma-separated tags.
-                - new_tags (str): Additional comma-separated tags to add.
                 - yaml (bool): Whether to save metadata in YAML format. Defaults to JSON.
 
         Returns:
@@ -1401,18 +1400,10 @@ Main Script Meta:""")
             item = i.get('item')
         if not item:
             return {'return': 1, 'error': f"""No script item given to add. Please use mlc add script <repo_name>:<script_name> --tags=<script_tags> format to add a script to a given repo"""}
-            
-        if ":" in item:
-            item_split = item.split(":")
-            item_repo = item_split[0]
-            item = item_split[1]
-        else:
-            item_repo = i.get("item_repo", self.local_repo)
-
         ii = {}
         ii['target'] = "script"
         ii['src_tags'] = i.get("template_tags", "template,generic")
-        ii['dest'] = f"""{item_repo}:{item}"""
+        ii['dest'] = item
         ii['tags'] = i.get('tags', [])
         res =  self.cp(ii)
 
