@@ -145,7 +145,7 @@ jobs:
       run: |
         rm -r $HOME/MLC/repos/mlcommons@mlperf-automations
         mlc rm repo mlcommons@mlperf-automations
-        mlc pull repo mlcommons@mlperf-automations
+        mlc pull repo mlcommons@mlperf-automations --branch=dev
         
     - name: Test 13 - add script - Add a new MLC script
       run: |
