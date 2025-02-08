@@ -425,6 +425,17 @@ def convert_args_to_dictionary(inp):
 
     return {'return': 0, 'args_dict': args_dict}
 
+def is_valid_url(url):
+    pattern = re.compile(
+        r"^(https?|ftp)://"  # Protocol (http, https, ftp)
+        r"(\S+:\S+@)?"  # Optional username:password@
+        r"([a-zA-Z0-9.-]+)"  # Domain
+        r"(:\d{2,5})?"  # Optional port
+        r"(/[\S]*)?$",  # Path
+        re.IGNORECASE
+    )
+    return re.match(pattern, url) is not None
+
 
 def sub_input(i, keys, reverse=False):
     """

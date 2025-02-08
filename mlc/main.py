@@ -147,6 +147,10 @@ class Action:
 
         # Iterate through the list of repository paths
         for repo_path in repo_paths:
+            if not os.path.exists(repo_path):
+                logger.warning(f"""Warning: {repo_path} not found. Consider doing `mlc rm repo {repo_path}`. Skipping...""")
+                continue
+
             if is_curdir_inside_path(repo_path):
                 self.current_repo_path = repo_path
             repo_path = repo_path.strip()  # Remove any extra whitespace or newlines
@@ -198,48 +202,6 @@ class Action:
             logger.error(f"Error reading file: {e}")
             return None
     
-    def conflicting_repo(self, repo_meta):
-        for repo_object in self.repos:
-            if repo_object.meta.get('uid', '') == '':
-                return {"return": 1, "error": f"UID is not present in file 'meta.yaml' in the repo path {repo_object.path}"}
-            if repo_meta["uid"] == repo_object.meta.get('uid', ''):
-                if repo_meta['path'] == repo_object.path:
-                    return {"return": 1, "error": f"Same repo is already registered"}
-                else:
-                    return {"return": 1, "error": f"Conflicting with repo in the path {repo_object.path}", "conflicting_path": repo_object.path}
-        return {"return": 0}
-    
-    def register_repo(self, repo_meta):
-        # Get the path to the repos.json file in $HOME/MLC
-        repos_file_path = os.path.join(self.repos_path, 'repos.json')
-
-        with open(repos_file_path, 'r') as f:
-            repos_list = json.load(f)
-        
-        new_repo_path = repo_meta.get('path')
-        if new_repo_path and new_repo_path not in repos_list:
-            repos_list.append(new_repo_path)
-            logger.info(f"Added new repo path: {new_repo_path}")
-
-        with open(repos_file_path, 'w') as f:
-            json.dump(repos_list, f, indent=2)
-            logger.info(f"Updated repos.json at {repos_file_path}")
-
-    def unregister_repo(self, repo_path):
-        logger.info(f"Unregistering the repo in path {repo_path}")
-        repos_file_path = os.path.join(self.repos_path, 'repos.json')
-
-        with open(repos_file_path, 'r') as f:
-            repos_list = json.load(f)
-        
-        if repo_path in repos_list:
-            repos_list.remove(repo_path)
-            with open(repos_file_path, 'w') as f:
-                json.dump(repos_list, f, indent=2)  
-            logger.info(f"Path: {repo_path} has been removed.")
-        else:
-            logger.info(f"Path: {repo_path} not found in {repos_file_path}. Nothing to be unregistered!")
-
 
     def __init__(self):        
         setup_logging(log_path=os.getcwd(),log_file='mlc-log.txt')
@@ -330,10 +292,13 @@ class Action:
         if res["return"] > 0:
             return res
 
+        if len(res["list"]) == 0:
+            return {'return': 1, 'error': f"""The given repo {item_repo} is not registered in MLC"""}
+
         # Determine paths and metadata format
         repo = res["list"][0]
         repo_path = repo.path
-
+        
         target_name = i.get('target_name', self.action_type)
         target_path = os.path.join(repo_path, target_name)
         if target_name == "cache":
@@ -434,7 +399,7 @@ class Action:
 
     def save_new_meta(self, i, item_id, item_name, target_name, item_path, repo):
         # Prepare metadata
-        item_meta = i.get('meta')
+        item_meta = i.get('meta', {})
         item_meta.update({
             "alias": item_name,
             "uid": item_id,
@@ -545,6 +510,7 @@ class Action:
 
         # Check if the name matches the pattern
         return bool(re.fullmatch(hex_uid_pattern, name))
+
 
     def cp(self, run_args):
         action_target = run_args['target']
@@ -945,6 +911,100 @@ class RepoAction(Action):
         self.parent = parent
         self.__dict__.update(vars(parent))
 
+
+    def add(self, run_args):
+        if not run_args['repo']:
+            logger.error("The repository to be added is not specified")
+            return {"return": 1, "error": "The repository to be added is not specified"}
+
+        i_repo_path = run_args['repo'] #can be a path, forder_name or URL
+        repo_folder_name = os.path.basename(i_repo_path)
+
+        repo_path = os.path.join(self.repos_path, repo_folder_name)
+
+        if os.path.exists(repo_path):
+            return {'return': 1, "error": f"""Repo {run_args['repo']} already exists at {repo_path}"""}
+        for repo in self.repos:
+            if repo.path == i_repo_path:
+                return {'return': 1, "error": f"""Repo {run_args['repo']} already exists at {repo_path}"""}
+
+        if not os.path.exists(i_repo_path):
+            #check if its an URL
+            if utils.is_valid_url(i_repo_path):
+                if "github.com" in i_repo_path:
+                    res = self.github_url_to_user_repo_format(i_repo_path)
+                    if res['return'] > 0:
+                        return res
+                    repo_folder_name = res['value']
+                    repo_path = os.path.join(self.repos_path, repo_folder_name)
+
+            os.makedirs(repo_path)
+        else:
+            repo_path = os.path.abspath(i_repo_path)
+        logger.info(f"""New repo path: {repo_path}""")
+
+        #check if it has MLC meta
+        meta_file = os.path.join(repo_path, "meta.yaml")
+        if not os.path.exists(meta_file):
+            meta = {}
+            meta['uid'] = utils.get_new_uid()['uid']
+            meta['alias'] = repo_folder_name
+            meta['git'] = True
+            utils.save_yaml(meta_file, meta)
+        else:
+            meta = utils.read_yaml(meta_file)
+        self.register_repo(repo_path, meta)
+
+        return {'return': 0}
+
+    def conflicting_repo(self, repo_meta):
+        for repo_object in self.repos:
+            if repo_object.meta.get('uid', '') == '':
+                return {"return": 1, "error": f"UID is not present in file 'meta.yaml' in the repo path {repo_object.path}"}
+            if repo_meta["uid"] == repo_object.meta.get('uid', ''):
+                if repo_meta['path'] == repo_object.path:
+                    return {"return": 1, "error": f"Same repo is already registered"}
+                else:
+                    return {"return": 1, "error": f"Conflicting with repo in the path {repo_object.path}", "conflicting_path": repo_object.path}
+        return {"return": 0}
+    
+    def register_repo(self, repo_path, repo_meta):
+    
+        if repo_meta.get('deps'):
+            for dep in repo_meta['deps']:
+                self.pull_repo(dep['url'], branch=dep.get('branch'), checkout=dep.get('checkout'))
+
+        # Get the path to the repos.json file in $HOME/MLC
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
+
+        with open(repos_file_path, 'r') as f:
+            repos_list = json.load(f)
+        
+        if repo_path not in repos_list:
+            repos_list.append(repo_path)
+            logger.info(f"Added new repo path: {repo_path}")
+
+        with open(repos_file_path, 'w') as f:
+            json.dump(repos_list, f, indent=2)
+            logger.info(f"Updated repos.json at {repos_file_path}")
+        return {'return': 0}
+
+    def unregister_repo(self, repo_path):
+        logger.info(f"Unregistering the repo in path {repo_path}")
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
+
+        with open(repos_file_path, 'r') as f:
+            repos_list = json.load(f)
+        
+        if repo_path in repos_list:
+            repos_list.remove(repo_path)
+            with open(repos_file_path, 'w') as f:
+                json.dump(repos_list, f, indent=2)  
+            logger.info(f"Path: {repo_path} has been removed.")
+        else:
+            logger.info(f"Path: {repo_path} not found in {repos_file_path}. Nothing to be unregistered!")
+        return {'return': 0}
+
     def find(self, run_args):
         try:
             # Get repos_list using the existing method
@@ -1101,10 +1161,12 @@ class RepoAction(Action):
                     logger.warning(f"The repo to be cloned has conflict with the repo already in the path: {is_conflict['conflicting_path']}")
                     logger.warning(f"The repo currently being pulled will be registered in repos.json and already existing one would be unregistered.")
                     self.unregister_repo(is_conflict['conflicting_path'])
-                    self.register_repo(meta_data)
+                    self.register_repo(repo_path, meta_data)
                     return {"return": 0}
             else:         
-                self.register_repo(meta_data)
+                r = self.register_repo(repo_path, meta_data)
+                if r['return'] > 0:
+                    return r
                 return {"return": 0}
 
         except subprocess.CalledProcessError as e:
@@ -1184,6 +1246,46 @@ class ScriptAction(Action):
             i['target_name'] = "script"
         logger.debug(f"Removing script with input: {i}")
         return self.parent.rm(i)
+
+    def add(self, i):
+        """
+        Adds a new script to the repository.
+
+        Args:
+            i (dict): Input dictionary with the following keys:
+                - item_repo (tuple): Repository alias and UID (default: local repo).
+                - item (str): Item alias and optional UID in "alias,uid" format.
+                - tags (str): Comma-separated tags.
+                - new_tags (str): Additional comma-separated tags to add.
+                - yaml (bool): Whether to save metadata in YAML format. Defaults to JSON.
+
+        Returns:
+            dict: Result of the operation with 'return' code and error/message if applicable.
+        """
+        # Determine repository
+        if i.get('details'):
+            item = i['details']
+        else:
+            item = i.get('item')
+        if not item:
+            return {'return': 1, 'error': f"""No script item given to add. Please use mlc add script <repo_name>:<script_name> --tags=<script_tags> format to add a script to a given repo"""}
+            
+        if ":" in item:
+            item_split = item.split(":")
+            item_repo = item_split[0]
+            item = item_split[1]
+        else:
+            item_repo = i.get("item_repo", self.local_repo)
+
+        i['item_repo'] = item_repo
+        i['item'] = item
+        i['target_name'] = "script"
+        i['yaml'] = True
+        res = self.parent.add(i)
+        if res['return'] > 0:
+            return res
+        #Todo post processing to update the script meta
+        return res
 
     def dynamic_import_module(self, script_path):
         # Validate the script_path
@@ -1428,16 +1530,8 @@ def main():
     # The chosen subcommand will be stored in the "command" attribute of the parsed arguments.
     subparsers = parser.add_subparsers(dest='command', required=True)
 
-    for action in ['pull']:
-        # Pull parser - handles repo URLs directly
-        # The chosen subcommand will be stored in the "pull" attribute of the parsed arguments.
-        pull_parser = subparsers.add_parser('pull', help='Pull a repository by URL or target.')
-        pull_parser.add_argument('target', choices=['repo'], help='Target type (repo).')
-        pull_parser.add_argument('repo', nargs='?', help='Repo to pull in URL format or owner@repo_name format for github repos')
-        pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
-
     # Script and Cache-specific subcommands
-    for action in ['run', 'test', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
+    for action in ['run', 'pull', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
@@ -1469,14 +1563,16 @@ def main():
     run_args = res['args_dict']
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
-
-
-    if args.command in ['rm','find']:
+        
+    if args.command in ['pull', 'rm', 'add', 'find']:
         if args.target == "repo":
             run_args['repo'] = args.details
   
     if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
         run_args['tags'] = args.details
+
+    if not run_args.get('details') and args.details:
+        run_args['details'] = args.details
 
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
