@@ -163,13 +163,13 @@ jobs:
       run: |
         mlc show script --tags=run-mlperf,inference
         mlc show script 863735b7db8c44fc
-        mlc show script 863735b7db8c44fc,detect-os
+        mlc show script detect-os,863735b7db8c44fc
         mlc show script detect-os
 
     - name: Test 16 - find script
       run: |
         mlc find script --tags=run-mlperf,inference
         mlc find script 863735b7db8c44fc
-        mlc find script 863735b7db8c44fc,detect-os
+        mlc find script detect-os,863735b7db8c44fc
         mlc find script detect-os
 
