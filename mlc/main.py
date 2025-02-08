@@ -954,23 +954,21 @@ class RepoAction(Action):
             else:
                 repo = run_args.get('repo', run_args.get('item', run_args.get('artifact')))
 
-                # Check if repo is None or empty
+            # Check if repo is None or empty
             if not repo:
-                raise ValueError(
-                        "Please enter a Repo Alias, Repo UID, or Repo URL in one of the following formats:\n"
-                        "- <repo_owner>@<repos_name>\n"
-                        "- <repo_url>\n"
-                        "- <repo_uid>\n"
-                        "- <repo_alias>\n"
-                        "- <repo_alias>,<repo_uid>"
-    )
+                return {"return": 1, "error": "Please enter a Repo Alias, Repo UID, or Repo URL in one of the following formats:\n"
+                                         "- <repo_owner>@<repos_name>\n"
+                                         "- <repo_url>\n"
+                                         "- <repo_uid>\n"
+                                         "- <repo_alias>\n"
+                                         "- <repo_alias>,<repo_uid>"}
 
             # Handle the different repo input formats
             repo_name = None
             repo_uid = None
 
             # Check if the repo is in the format of a repo UID (alphanumeric string)
-            if repo.isalnum():  # Assuming repo_uid is alphanumeric
+            if self.is_uid(repo):
                 repo_uid = repo
             if "," in repo:
                 repo_split = repo.split(",")
@@ -979,25 +977,18 @@ class RepoAction(Action):
                     repo_uid = repo_split[1]
             elif "@" in repo:
                 repo_name = repo
-            elif re.match(r"(?:https?://)?(?:www\.)?github\.com/([^/]+)/([^/.]+)(?:\.git)?", repo):
-                # Convert GitHub URL to user@repo_name format if necessary
-                pattern = r"(?:https?://)?(?:www\.)?github\.com/([^/]+)/([^/.]+)(?:\.git)?"
-                match = re.match(pattern, repo)
-                if match:
-                    user, repo_name = match.groups()
-                    repo_name = f"{user}@{repo_name}"
+            elif "github.com" in repo:
+                result = self.github_url_to_user_repo_format(repo)
+                if result["return"] == 0:
+                    repo_name = result["value"]
                 else:
-                    raise ValueError(f"Invalid GitHub URL format for: {repo}")
-            else:
-                # If URL is malformed, handle it separately
-                if "github.com" in repo and not re.match(r"(https?://)?(?:www\.)?github\.com/([^/]+)/([^/.]+)(?:\.git)?", repo):
-                    raise ValueError(f"Invalid GitHub URL format for: {repo}")
+                    return result
             
             # Check if repo_name exists in repos.json
             matched_repo_path = None
             for repo_obj in repos_list:
                 if repo_name and repo_name == os.path.basename(repo_obj.path) :
-                    matched_repo_path = repo_obj.path
+                    matched_repo_path = repo_obj
                     break
 
             # Search through self.repos for matching repos
@@ -1007,16 +998,16 @@ class RepoAction(Action):
                     lst.append(i)
                 elif repo_name == i.meta['alias']:
                     lst.append(i)
-                elif repo.isalnum() and not any(i.meta['uid'] == repo_uid for i in self.repos):
-                    raise ValueError(f"No repository with UID: '{repo_uid}' was found")
-                elif not matched_repo_path and not any(i.meta['alias'] == repo_name for i in self.repos) and not any(i.meta['uid'] == repo_uid for i in self.repos ):
-                    raise ValueError(f"No repository with alias: '{repo_name}' was found")
+                elif self.is_uid(repo) and not any(i.meta['uid'] == repo_uid for i in self.repos):
+                    return {"return": 1, "error": f"No repository with UID: '{repo_uid}' was found"}
                 elif "," in repo and not matched_repo_path and not any(i.meta['uid'] == repo_uid for i in self.repos) and not any(i.meta['alias'] == repo_name for i in self.repos):
-                    raise ValueError(f"No repository with alias: '{repo_name}' and UID: '{repo_uid}' was found")
-
-
+                    return {"return": 1, "error": f"No repository with alias: '{repo_name}' and UID: '{repo_uid}' was found"}
+                elif not matched_repo_path and not any(i.meta['alias'] == repo_name for i in self.repos) and not any(i.meta['uid'] == repo_uid for i in self.repos ):
+                    return {"return": 1, "error": f"No repository with alias: '{repo_name}' was found"}
+                
             # Append the matched repo path
-            lst.append(matched_repo_path)
+            if(len(lst)==0):
+                lst.append(matched_repo_path)
             
             return {'return': 0, 'list': lst}
         except Exception as e:
@@ -1426,19 +1417,8 @@ def process_console_output(res, target, action, run_args):
         if len(res['list']) == 0:
             logger.warn(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
         else:
-            seen_paths = set()  # To avoid duplicate logging
-            for item in res["list"]:
-                if isinstance(item, str):  # If item is a string (repo path)
-                    if item not in seen_paths:
-                        logger.info(f"""Item path: {item}""")
-                        seen_paths.add(item)
-
-                elif hasattr(item, "path"):  # If item has `.path` attribute
-                    if item.path not in seen_paths:
-                        logger.info(f"""Item path: {item.path}""")
-                        seen_paths.add(item.path)
-
-
+            for item in res['list']:
+                logger.info(f"""Item path: {item.path}""")
 
 # Main CLI function
 def main():
