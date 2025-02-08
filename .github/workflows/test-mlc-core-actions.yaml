@@ -139,4 +139,10 @@ jobs:
         mlc add repo my-new-repo
         mlc add repo https://github.com/mlcommons/inference
         mlc add repo https://mygit.com/myrepo
+      
+    - name: Test 12 - rm repo where we have a corrupt entry 
+      run: |
+        sudo apt-get install jq
+        jq '. += ["${HOME}/MLC/repos/anandhu-eng@mlperf-automations"]' ${HOME}/MLC/repos/repos.json > tmp.json && mv tmp.json ${HOME}/MLC/repos/repos.json
+        mlc rm repo anandhu-eng@mlperf-automations
         
