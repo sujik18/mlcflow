@@ -690,7 +690,7 @@ class Action:
                 else:
                     alias = details_split[0]
 
-        if ":" in alias:
+        if alias and ":" in alias:
             alias_split = alias.split(":")
             alias = alias_split[1]
             item_repo = alias_split[0]
