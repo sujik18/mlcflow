@@ -675,6 +675,7 @@ class Action:
                         result.append(it)
         return {'return': 0, 'list': result}
 
+    find = search
 
 
 class Index:
@@ -737,7 +738,7 @@ class Index:
         uid = meta['uid']
         index = self.get_index(folder_type, uid)
         if index == -1: 
-            logger.warn(f"Index is not having the {folder_type} item {path}")
+            logger.warning(f"Index is not having the {folder_type} item {path}")
         else:
             del(self.indices[folder_type][index])
 
@@ -1270,7 +1271,11 @@ class ScriptAction(Action):
     def search(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
-        return self.parent.search(i)
+        res = self.parent.search(i)
+        #print(res)
+        return res
+
+    find = search
 
     def rm(self, i):
         if not i.get('target_name'):
@@ -1278,6 +1283,25 @@ class ScriptAction(Action):
         logger.debug(f"Removing script with input: {i}")
         return self.parent.rm(i)
 
+    def show(self, run_args):
+        self.action_type = "script"
+        res = self.search(run_args)
+        logger.info(f"Showing script with tags: {run_args.get('tags')}")
+        script_meta_keys_to_show = ["uid", "alias", "tags", "new_env_keys", "new_state_keys", "cache"]
+        for item in res['list']:
+            print(f"""Location: {item.path}:
+Main Script Meta:""")
+            for key in script_meta_keys_to_show:
+                if key in item.meta:
+                    print(f"""    {key}: {item.meta[key]}""")
+            if "input_mapping" in item.meta:
+                print("    Input mapping:")
+                utils.printd(item.meta["input_mapping"], begin_spaces=8)
+            print("......................................................")
+            print(f"""For full script meta, see meta file at {os.path.join(item.path, "meta.yaml")}""")
+            print("")
+            
+        return {'return': 0}
     def add(self, i):
         """
         Adds a new script to the repository.
@@ -1404,6 +1428,7 @@ class CacheAction(Action):
         i['target_name'] = "cache"
         #logger.debug(f"Searching for cache with input: {i}")
         return self.parent.search(i)
+
     find = search
 
     def rm(self, i):
@@ -1543,12 +1568,12 @@ if default_parent is None:
     default_parent = Action()
 
 def process_console_output(res, target, action, run_args):
-    if action == "find":
+    if action in ["find", "search"]:
         if "list" not in res:
             logger.error("'list' entry not found in find result")
             return  # Exit function if there's an error
         if len(res['list']) == 0:
-            logger.warn(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
+            logger.warning(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
         else:
             for item in res['list']:
                 logger.info(f"""Item path: {item.path}""")
