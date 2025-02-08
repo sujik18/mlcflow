@@ -175,7 +175,7 @@ class Action:
                 continue
 
             if meta['alias'] == "local":
-                self.local_repo = (meta['alias'], meta['uid'])
+                self.local_repo = f"""{meta['alias']},{meta['uid']}"""
             # Create a Repo object and add it to the list
             repos_list.append(Repo(path=repo_path, meta=meta))
         return repos_list
@@ -264,6 +264,7 @@ class Action:
         item_repo = i.get("item_repo")
         if not item_repo:
             item_repo = self.local_repo
+            
 
         # Parse item details
         item = i.get("item")
