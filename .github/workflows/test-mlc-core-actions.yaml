@@ -107,7 +107,7 @@ jobs:
     - name: Test 5 - find cache - Cache not present
       run: |
         mlc find cache --tags=detect,os 2>&1 | tee test5.log
-        if ! grep -q "No cache entry found for the specified tags:" test5.log; then
+        if ! grep -q "No cache entry found for the specified input:" test5.log; then
           exit 1
         fi
 
