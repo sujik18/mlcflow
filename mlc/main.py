@@ -293,10 +293,13 @@ class Action:
         if res["return"] > 0:
             return res
 
+        if len(res["list"]) == 0:
+            return {'return': 1, 'error': f"""The given repo {item_repo} is not registered in MLC"""}
+
         # Determine paths and metadata format
         repo = res["list"][0]
         repo_path = repo.path
-
+        
         target_name = i.get('target_name', self.action_type)
         target_path = os.path.join(repo_path, target_name)
         if target_name == "cache":
@@ -397,7 +400,7 @@ class Action:
 
     def save_new_meta(self, i, item_id, item_name, target_name, item_path, repo):
         # Prepare metadata
-        item_meta = i.get('meta')
+        item_meta = i.get('meta', {})
         item_meta.update({
             "alias": item_name,
             "uid": item_id,
@@ -508,6 +511,7 @@ class Action:
 
         # Check if the name matches the pattern
         return bool(re.fullmatch(hex_uid_pattern, name))
+
 
     def cp(self, run_args):
         action_target = run_args['target']
@@ -1191,6 +1195,46 @@ class ScriptAction(Action):
         logger.debug(f"Removing script with input: {i}")
         return self.parent.rm(i)
 
+    def add(self, i):
+        """
+        Adds a new script to the repository.
+
+        Args:
+            i (dict): Input dictionary with the following keys:
+                - item_repo (tuple): Repository alias and UID (default: local repo).
+                - item (str): Item alias and optional UID in "alias,uid" format.
+                - tags (str): Comma-separated tags.
+                - new_tags (str): Additional comma-separated tags to add.
+                - yaml (bool): Whether to save metadata in YAML format. Defaults to JSON.
+
+        Returns:
+            dict: Result of the operation with 'return' code and error/message if applicable.
+        """
+        # Determine repository
+        if i.get('details'):
+            item = i['details']
+        else:
+            item = i.get('item')
+        if not item:
+            return {'return': 1, 'error': f"""No script item given to add. Please use mlc add script <repo_name>:<script_name> --tags=<script_tags> format to add a script to a given repo"""}
+            
+        if ":" in item:
+            item_split = item.split(":")
+            item_repo = item_split[0]
+            item = item_split[1]
+        else:
+            item_repo = i.get("item_repo", self.local_repo)
+
+        i['item_repo'] = item_repo
+        i['item'] = item
+        i['target_name'] = "script"
+        i['yaml'] = True
+        res = self.parent.add(i)
+        if res['return'] > 0:
+            return res
+        #Todo post processing to update the script meta
+        return res
+
     def dynamic_import_module(self, script_path):
         # Validate the script_path
         if not os.path.exists(script_path):
@@ -1475,6 +1519,9 @@ def main():
   
     if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
         run_args['tags'] = args.details
+
+    if not run_args.get('details') and args.details:
+        run_args['details'] = args.details
 
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
