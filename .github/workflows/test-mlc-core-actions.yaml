@@ -175,7 +175,7 @@ jobs:
 
     - name: Test 17 - rm script
       run: |
-        mlc rm script get-ipol-src
-        mlc rm script --tags=app,image,corner-detection
-        mlc rm script 63080407db4d4ac4
+        mlc rm script get-ipol-src -f
+        mlc rm script --tags=app,image,corner-detection -f
+        mlc rm script 63080407db4d4ac4 -f
     
