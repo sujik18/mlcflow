@@ -149,10 +149,10 @@ jobs:
         
     - name: Test 13 - add script - Add a new MLC script
       run: |
-        mlc add script my-script-1
-        mlc add script my-script-2 --tags=my,new_tags
-        mlc add script my-script-2 --tags=my,new_tags2 --template_tags=detect,os
-        mlc add script mlcommons@mlperf-automations:my-script-2 --tags=my,new_tags2 --template_tags=detect,os
+        mlc add script my-script-1 --tags=my,new-tags-1
+        mlc add script my-script-2 --tags=my,new-tags-2
+        mlc add script my-script-2 --tags=my,new-tags3 --template_tags=detect,os
+        mlc add script mlcommons@mlperf-automations:my-script-2 --tags=my,new-tags4 --template_tags=detect,os
       
     - name: Test 14 - mv script - Move/rename an MLC script 
       run: |
