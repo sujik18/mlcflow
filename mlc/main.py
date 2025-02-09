@@ -1718,11 +1718,6 @@ def main():
     if args.command in ['pull', 'rm', 'add', 'find']:
         if args.target == "repo":
             run_args['repo'] = args.details
-        if args.target == "script":
-            print(args.extra)
-            print(args.details)
-            if args.extra:
-                pass
   
     if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
         run_args['tags'] = args.details
@@ -1741,7 +1736,6 @@ def main():
     action = get_action(args.target)
     # Dynamically call the method (e.g., run, list, show)
     if action and hasattr(action, args.command):
-        print(run_args)
         method = getattr(action, args.command)
         res = method(run_args)
         if res['return'] > 0:
