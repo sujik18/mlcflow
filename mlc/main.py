@@ -676,6 +676,7 @@ class Action:
         dest = res['dest']
         ii = {}
         ii['item'] = src.meta['uid']
+        ii['f'] = True  # To remove the source without asking for user permission
         res = self.rm(ii)
         if res['return'] > 0:
             return res
