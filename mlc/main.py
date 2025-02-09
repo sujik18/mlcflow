@@ -547,7 +547,7 @@ class Action:
     def cp(self, run_args):
         action_target = run_args['target']
         if action_target != "script":
-            return {"return": 1, "error": f"The {action_target} action is not currently supported for mv/cp"}
+            return {"return": 1, "error": f"The {action_target} target is not currently supported for mv/cp actions"}
         inp = {}
         src_item = run_args.get('src')
         src_tags = None
@@ -674,7 +674,7 @@ class Action:
     def mv(self, run_args):
         target_name = run_args['target']
         if target_name != "script":
-            return {"return": 1, "error": f"The {target_name} action is not currently supported for mv/cp"}
+            return {"return": 1, "error": f"The {target_name} target is not currently supported for mv/cp actions"}
         res = self.cp(run_args)
         if res['return'] > 0:
             return res
