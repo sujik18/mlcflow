@@ -175,6 +175,7 @@ jobs:
 
     - name: Test 17 - rm script
       run: |
-        mlc rm script detect-os
-        mlc rm script --tags=detect,cpu
+        mlc rm script get-ipol-src -f
+        mlc rm script --tags=app,image,corner-detection -f
+        mlc rm script 63080407db4d4ac4 -f
     
