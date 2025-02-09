@@ -546,7 +546,8 @@ class Action:
 
     def cp(self, run_args):
         action_target = run_args['target']
-
+        if action_target != "script":
+            return {"return": 1, "error": f"The {action_target} target is not currently supported for mv/cp actions"}
         inp = {}
         src_item = run_args.get('src')
         src_tags = None
@@ -611,6 +612,9 @@ class Action:
                 if not self.current_repo_path:
                     return {'return': 1, 'error': f"""Current directory is not inside a registered MLC repo and so using ".:" is not valid"""}
                 target_repo = self.current_repo_path
+            else:
+                if not any(os.path.basename(repodata.path) == target_repo for repodata in self.repos):
+                    return {'return': 1, 'error': f"""The target repo {target_repo} is not registered in MLC. Either register in MLC by cloning from Git through command `mlc pull repo` or create repo using `mlc add repo` command and try to rerun the command again"""}
             target_repo_path = os.path.join(self.repos_path, target_repo)
             target_repo = Repo(target_repo_path)
             target_item_name = target_split[1].strip()
@@ -669,6 +673,8 @@ class Action:
 
     def mv(self, run_args):
         target_name = run_args['target']
+        if target_name != "script":
+            return {"return": 1, "error": f"The {target_name} target is not currently supported for mv/cp actions"}
         res = self.cp(run_args)
         if res['return'] > 0:
             return res
