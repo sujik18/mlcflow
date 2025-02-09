@@ -35,18 +35,21 @@ logger = logging.getLogger(__name__)
 # Set up logging configuration
 def setup_logging(log_path = os.getcwd(),log_file = 'mlc-log.txt'):
     
-    logFormatter = ColoredFormatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s')
-    logger.setLevel(logging.INFO)
+    if not logger.hasHandlers():
+        logFormatter = ColoredFormatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s')
+        logger.setLevel(logging.INFO)
+   
+
+        # File hander for logging in file in the specified path
+        file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
+        file_handler.setFormatter(logging.Formatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s'))
+        logger.addHandler(file_handler)
     
-    # File hander for logging in file in the specified path
-    file_handler = logging.FileHandler("{0}/{1}".format(log_path, log_file))
-    file_handler.setFormatter(logging.Formatter('[%(asctime)s %(filename)s:%(lineno)d %(levelname)s] - %(message)s'))
-    logger.addHandler(file_handler)
-    
-    # Console handler for logging on console
-    consoleHandler = logging.StreamHandler()
-    consoleHandler.setFormatter(logFormatter)
-    logger.addHandler(consoleHandler)
+        # Console handler for logging on console
+        consoleHandler = logging.StreamHandler()
+        consoleHandler.setFormatter(logFormatter)
+        logger.addHandler(consoleHandler)
+        logger.propagate = False
 
 
 # Base class for CLI actions
@@ -144,6 +147,10 @@ class Action:
 
         # Iterate through the list of repository paths
         for repo_path in repo_paths:
+            if not os.path.exists(repo_path):
+                logger.warning(f"""Warning: {repo_path} not found. Consider doing `mlc rm repo {repo_path}`. Skipping...""")
+                continue
+
             if is_curdir_inside_path(repo_path):
                 self.current_repo_path = repo_path
             repo_path = repo_path.strip()  # Remove any extra whitespace or newlines
@@ -156,7 +163,17 @@ class Action:
 
             # Check if meta.yaml exists
             if not os.path.isfile(meta_yaml_path):
-                logger.warning(f"Warning: {meta_yaml_path} not found. Skipping...")
+                logger.warning(f"{meta_yaml_path} not found. Skipping...")
+                logger.warning(f"Deleting the {meta_yaml_path} entry from repos.json")
+                res = self.access(
+                    {
+                        "automation": "repo",
+                        "action": "rm",
+                        "repo": f"{os.path.basename(repo_path)}"    
+                    }
+                )
+                if res["return"] > 0:
+                    return res
                 continue
 
             # Load the YAML file
@@ -168,10 +185,9 @@ class Action:
                 continue
 
             if meta['alias'] == "local":
-                self.local_repo = (meta['alias'], meta['uid'])
+                self.local_repo = f"""{meta['alias']},{meta['uid']}"""
             # Create a Repo object and add it to the list
             repos_list.append(Repo(path=repo_path, meta=meta))
-
         return repos_list
 
     def load_repos(self):
@@ -196,55 +212,14 @@ class Action:
             logger.error(f"Error reading file: {e}")
             return None
     
-    def conflicting_repo(self, repo_meta):
-        for repo_object in self.repos:
-            if repo_object.meta.get('uid', '') == '':
-                return {"return": 1, "error": f"UID is not present in file 'meta.yaml' in the repo path {repo_object.path}"}
-            if repo_meta["uid"] == repo_object.meta.get('uid', ''):
-                if repo_meta['path'] == repo_object.path:
-                    return {"return": 1, "error": f"Same repo is already registered"}
-                else:
-                    return {"return": 1, "error": f"Conflicting with repo in the path {repo_object.path}", "conflicting_path": repo_object.path}
-        return {"return": 0}
-    
-    def register_repo(self, repo_meta):
-        # Get the path to the repos.json file in $HOME/MLC
-        repos_file_path = os.path.join(self.repos_path, 'repos.json')
-
-        with open(repos_file_path, 'r') as f:
-            repos_list = json.load(f)
-        
-        new_repo_path = repo_meta.get('path')
-        if new_repo_path and new_repo_path not in repos_list:
-            repos_list.append(new_repo_path)
-            logger.info(f"Added new repo path: {new_repo_path}")
-
-        with open(repos_file_path, 'w') as f:
-            json.dump(repos_list, f, indent=2)
-            logger.info(f"Updated repos.json at {repos_file_path}")
-
-    def unregister_repo(self, repo_path):
-        logger.info(f"Unregistering the repo in path {repo_path}")
-        repos_file_path = os.path.join(self.repos_path, 'repos.json')
-
-        with open(repos_file_path, 'r') as f:
-            repos_list = json.load(f)
-        
-        if repo_path in repos_list:
-            repos_list.remove(repo_path)
-            with open(repos_file_path, 'w') as f:
-                json.dump(repos_list, f, indent=2)  
-            logger.info(f"Path: {repo_path} has been removed.")
-        else:
-            logger.info(f"Path: {repo_path} not found in {repos_file_path}. Nothing to be unregistered!")
-
 
     def __init__(self):        
-        setup_logging(log_path='.',log_file='mlc-log.txt')
+        setup_logging(log_path=os.getcwd(),log_file='mlc-log.txt')
         self.logger = logger
+
         temp_repo = os.environ.get('MLC_REPOS','').strip()
         if temp_repo == '':
-            self.repos_path = os.path.expanduser('~/MLC/repos')
+            self.repos_path = os.path.join(os.path.expanduser("~"), "MLC", "repos")
         else:
             self.repos_path = temp_repo
 
@@ -299,9 +274,11 @@ class Action:
         item_repo = i.get("item_repo")
         if not item_repo:
             item_repo = self.local_repo
+            
 
         # Parse item details
         item = i.get("item")
+
         item_name, item_id = (None, None)
         if item:
             item_parts = item.split(",")
@@ -321,16 +298,19 @@ class Action:
             {
                 "automation": "repo",
                 "action": "find",
-                "item": f"{item_repo[0]},{item_repo[1]}",
+                "item": f"{item_repo}",
             }
         )
         if res["return"] > 0:
             return res
 
+        if len(res["list"]) == 0:
+            return {'return': 1, 'error': f"""The given repo {item_repo} is not registered in MLC"""}
+
         # Determine paths and metadata format
         repo = res["list"][0]
         repo_path = repo.path
-
+        
         target_name = i.get('target_name', self.action_type)
         target_path = os.path.join(repo_path, target_name)
         if target_name == "cache":
@@ -340,9 +320,11 @@ class Action:
 
         item_path = os.path.join(target_path, folder_name)
 
+        if os.path.exists(item_path):
+            return {"return": 1, "error": f"""Item exists at {item_path}"""}
+
         # Create item directory if it does not exist
-        if not os.path.exists(item_path):
-            os.makedirs(item_path)
+        os.makedirs(item_path)
 
         res = self.save_new_meta(i, item_id, item_name, target_name, item_path, repo)
         if res['return'] > 0:
@@ -364,15 +346,15 @@ class Action:
                 - item_repo (tuple): Repository alias and UID (default: local repo).
                 - item (str): Item alias and optional UID in "alias,uid" format.
                 - tags (str): Comma-separated tags.
-                - new_tags (str): Additional comma-separated tags to add.
                 - yaml (bool): Whether to save metadata in YAML format. Defaults to JSON.
 
         Returns:
             dict: Result of the operation with 'return' code and error/message if applicable.
         """
+        inp = {}
 
         # Parse item details
-        item = i.get("item",i.get('artifact'))
+        item = i.get("item",i.get('artifact', i.get('details')))
         item_name, item_id, item_tags = (None, None, None)
         if item:
             item_parts = item.split(",")
@@ -382,10 +364,15 @@ class Action:
         elif i.get('tags'):
             item_tags = i['tags']
         else:
-            return {'return': 1, 'error': 'Item not given for rm action'}
+            if i.get('target_name', self.action_type) != "cache":
+                return {'return': 1, 'error': 'Item not given for rm action'}
+            else:
+                inp['fetch_all'] = True
 
+        # Check force remove is set to True
+        # Setting force remove to true would lead to removal of assets without user prompt
+        force_remove = True if i.get('f') else False
 
-        inp = {}
         if item_name:
             inp['alias'] = item_name
             inp['folder_name'] = item_name #we dont know if the user gave the alias or the folder name, we first check for alias and then the folder name
@@ -399,18 +386,22 @@ class Action:
         target_name = i.get('target_name', self.action_type)
         inp['target_name'] = target_name
         res = self.search(inp)
+        if res['return'] > 0:
+            return res
 
         if len(res['list']) == 0:
-            return {'return': 1, 'error': f'No {target_name} found for {inp}'}
+            return {'return': 16, 'error': f'No {target_name} found for {inp}'}
         elif len(res['list']) > 1:
             logger.info(f"More than 1 {target_name} found for {inp}:")
             if not i.get('all'):
                 for idx, item in enumerate(res["list"]):
                     logger.info(f"{idx}. Path: {item.path}, Meta: {item.meta}")
 
-                user_choice = input("Would you like to proceed with all items? (yes/no): ").strip().lower()
-                if user_choice not in ['yes', 'y']:
-                    return {'return': 1, 'error': "Operation aborted by user."}
+                if not force_remove:
+                    user_choice = input("Would you like to proceed with all items? (yes/no): ").strip().lower()
+                    if user_choice in ['yes', 'y']:
+                        force_remove = True
+                    
         results = res['list']
         
         for result in results:
@@ -419,7 +410,15 @@ class Action:
         
         
             if os.path.exists(item_path):
-                shutil.rmtree(item_path)
+                if force_remove == True:
+                    shutil.rmtree(item_path)
+                else:
+                    user_choice = input(f"Confirm to delete {target_name} item: {item_path}? (yes/no): ").strip().lower()
+                    if user_choice not in ['yes', 'y']:
+                        continue
+                    else:
+                        shutil.rmtree(item_path)
+
                 logger.info(f"{target_name} item: {item_path} has been successfully removed")
 
             self.index.rm(item_meta, target_name, item_path)
@@ -431,15 +430,16 @@ class Action:
 
     def save_new_meta(self, i, item_id, item_name, target_name, item_path, repo):
         # Prepare metadata
-        item_meta = i.get('meta')
+        item_meta = i.get('meta', {})
         item_meta.update({
             "alias": item_name,
             "uid": item_id,
         })
 
         # Process tags
-        tags = i.get("tags", "").split(",") if i.get("tags") else []
+        tags = i.get("tags", "").split(",") if i.get("tags") else item_meta.get("tags", [])
         new_tags = i.get("new_tags", "").split(",") if i.get("new_tags") else []
+
         item_meta["tags"] = list(set(tags + new_tags))  # Ensure unique tags
 
         # Save metadata
@@ -543,36 +543,67 @@ class Action:
         # Check if the name matches the pattern
         return bool(re.fullmatch(hex_uid_pattern, name))
 
+
     def cp(self, run_args):
         action_target = run_args['target']
-        src_item = run_args['src']
-        target_item = run_args['dest']
-        src_split = src_item.split(":")
-        target_split = target_item.split(":")
-        if len(src_split) > 1:
-            src_repo = src_split[0].strip()
-            src_item = src_split[1].strip()
-        else:
-            src_item = src_split[0].strip()
 
         inp = {}
-        inp['alias'] = src_item
-        inp['folder_name'] = src_item #we dont know if the user gave the alias or the folder name, we first check for alias and then the folder name
-        if self.is_uid(src_item):
-            inp['uid'] = src_item
+        src_item = run_args.get('src')
+        src_tags = None
+        if src_item:
+            src_split = src_item.split(":")
+            if len(src_split) > 1:
+                src_repo = src_split[0].strip()
+                src_item = src_split[1].strip()
+            else:
+                src_item = src_split[0].strip()
+            inp['alias'] = src_item
+            inp['folder_name'] = src_item #we dont know if the user gave the alias or the folder name, we first check for alias and then the folder name
+        
+            if self.is_uid(src_item):
+                inp['uid'] = src_item
+
+        else:
+            #src_tags must be there
+            if not run_args.get("src_tags"):
+                return {'return': 1, 'error': 'Either "src" or "src_tags" must be provided as an input for cp method'}
+            src_tags = run_args['src_tags']
+            inp['tags'] = src_tags
 
         inp['target_name'] = action_target
+
         res = self.search(inp)
 
+        choice = 0
         if len(res['list']) == 0:
             return {'return': 1, 'error': f'No {action_target} found for {src_item}'}
-        elif len(res['list']) > 1:
-            return {'return': 1, 'error': f'More than 1 {action_target} found for {src_item}: {res["list"]}'}
-        else:
-            result = res['list'][0]
-            src_item_path = result.path
-            src_item_meta = result.meta
+        elif len(res['list']) > 1 and not run_args.get("quiet"):
+            print(f"More than one {action_target} found for {src_item}:")
 
+            # Display available options
+            for idx, item in enumerate(res['list'], start=1):
+                print(f"{idx}. {item.path}")
+
+            # Ask user to choose an item
+            while True:
+                choice = input("Select the correct one (enter number, default=1): ").strip()
+                if choice == "":
+                    choice = 1
+                try:
+                    choice = int(choice) - 1
+                    if 0 <= choice < len(res['list']):
+                        break
+                    else:
+                        print("Invalid selection. Please enter a number from the list.")
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+
+        result = res['list'][choice]
+        src_item_path = result.path
+        src_item_meta = result.meta
+
+        target_item = run_args['dest']
+        target_split = target_item.split(":")
 
         if len(target_split) > 1:
             target_repo = target_split[0].strip()
@@ -595,7 +626,7 @@ class Action:
             return res
 
         ii = {}
-        ii['meta'] = result.meta
+        ii['meta'] = result.meta.copy()
         if action_target == "script":
             ii['yaml'] = True
 
@@ -614,11 +645,13 @@ class Action:
 
         res = self.save_new_meta(ii, item_id, target_item_name, action_target, target_item_path, target_repo)
 
+        dest_item = Item(target_item_path, target_repo)
+        
         if res['return'] > 0:
             return res
         logger.info(f"{action_target} {src_item_path} copied to {target_item_path}")
 
-        return {'return': 0}
+        return {'return': 0, 'src': result, 'dest': dest_item}
 
     def copy_item(self, source_path, destination_path):
         try:
@@ -634,6 +667,28 @@ class Action:
 
         return {'return': 0}
 
+    def mv(self, run_args):
+        target_name = run_args['target']
+        res = self.cp(run_args)
+        if res['return'] > 0:
+            return res
+        src = res['src']
+        dest = res['dest']
+        ii = {}
+        ii['item'] = src.meta['uid']
+        ii['f'] = True  # To remove the source without asking for user permission
+        res = self.rm(ii)
+        if res['return'] > 0:
+            return res
+        
+        #Put the src uid to the destination path
+        dest.meta['uid'] = src.meta['uid']
+        dest._save_meta()
+        self.index.update(dest.meta, target_name, dest.path, dest.repo)
+        logger.info(f"""Item with uid {dest.meta['uid']} successfully moved from {src.path} to {dest.path}""")
+
+        return {'return': 0, 'src': src, 'dest': dest}
+
     def search(self, i):
         indices = self.index.indices
         target = i.get('target_name', self.action_type)
@@ -641,12 +696,53 @@ class Action:
         result = []
         uid = i.get("uid")
         alias = i.get("alias")
+        item_repo = i.get('item_repo')
+        fetch_all = True if i.get('fetch_all') else False
+
+        # For targets like cache, sometimes user would need to clear the entire cache folder present in the system
+        # this helps to fetch entire data pertaining to particular target
+        if fetch_all:
+            for res in target_index:
+                result.append(Item(res['path'], res['repo']))
+            return {'return': 0, 'list': result}
+
+        if not uid and not alias and i.get('details'):
+            details = i['details']
+            details_split = details.split(",")
+            if len(details_split) > 1:
+                alias = details_split[0]
+                uid = details_split[1]
+            else:
+                if self.is_uid(details_split[0]):
+                    uid = details_split[0]
+                else:
+                    alias = details_split[0]
+
+        if alias and ":" in alias:
+            alias_split = alias.split(":")
+            alias = alias_split[1]
+            item_repo = alias_split[0]
         folder_name = i.get("folder_name")
         found = False
+
+        if item_repo:
+            res = self.access(
+                {
+                    "action": "find",
+                    "target": "repo",
+                    "repo": f"{item_repo}"    
+                }
+            )
+            if res["return"] > 0:
+                return res
+            if len(res['list']) == 0:
+                return {'return': 1, 'error': f"""No repo found for {item_repo}"""}
+            item_repo = res['list'][0]
+
         if target_index:
             if uid or alias:
                 for res in target_index:
-                    if res["uid"] == uid or (alias and res["alias"] == alias):
+                    if (res["uid"] == uid or (alias and res["alias"] == alias)) and (not item_repo or item_repo == res['repo']):
                         it = Item(res['path'], res['repo'])
                         result.append(it)
                         found = True
@@ -656,7 +752,7 @@ class Action:
                             it = Item(res['path'], res['repo'])
                             #result.append(it)
             else:
-                tags= i.get("tags")
+                tags = i.get("tags")
                 tags_split = tags.split(",")
                 if target == "script":
                     non_variation_tags = [t for t in tags_split if not t.startswith("_")]
@@ -675,6 +771,7 @@ class Action:
                         result.append(it)
         return {'return': 0, 'list': result}
 
+    find = search
 
 
 class Index:
@@ -737,7 +834,7 @@ class Index:
         uid = meta['uid']
         index = self.get_index(folder_type, uid)
         if index == -1: 
-            logger.warn(f"Index is not having the {folder_type} item {path}")
+            logger.warning(f"Index is not having the {folder_type} item {path}")
         else:
             del(self.indices[folder_type][index])
 
@@ -866,6 +963,15 @@ class Item:
         else:
             logger.info(f"No meta file found in {self.path} for {self.meta}")
 
+    def _save_meta(self):
+        yaml_file = os.path.join(self.path, "meta.yaml")
+        json_file = os.path.join(self.path, "meta.json")
+
+        if os.path.exists(yaml_file):
+            utils.save_yaml(yaml_file, self.meta)
+        elif os.path.exists(json_file):
+            utils.save_json(json_file, self.meta)
+
 
 class Repo:
     def __init__(self, path, meta=None):
@@ -935,21 +1041,175 @@ class Automation:
 # Extends Action class
 class RepoAction(Action):
 
-    def find(self, run_args):
-        repo = run_args.get('item', run_args.get('artifact'))
-        repo_split = repo.split(",")
-        if len(repo_split) > 1:
-            repo_uid = repo_split[1]
-        repo_name = repo_split[0]
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
 
-        lst = []
-        for i in self.repos:
-            if repo_uid and i.meta['uid'] == repo_uid:
-                lst.append(i)
-            elif repo_name == i.meta['alias']:
-                lst.append(i)
+
+    def add(self, run_args):
+        if not run_args['repo']:
+            logger.error("The repository to be added is not specified")
+            return {"return": 1, "error": "The repository to be added is not specified"}
+
+        i_repo_path = run_args['repo'] #can be a path, forder_name or URL
+        repo_folder_name = os.path.basename(i_repo_path)
+
+        repo_path = os.path.join(self.repos_path, repo_folder_name)
+
+        if os.path.exists(repo_path):
+            return {'return': 1, "error": f"""Repo {run_args['repo']} already exists at {repo_path}"""}
+        for repo in self.repos:
+            if repo.path == i_repo_path:
+                return {'return': 1, "error": f"""Repo {run_args['repo']} already exists at {repo_path}"""}
+
+        if not os.path.exists(i_repo_path):
+            #check if its an URL
+            if utils.is_valid_url(i_repo_path):
+                if "github.com" in i_repo_path:
+                    res = self.github_url_to_user_repo_format(i_repo_path)
+                    if res['return'] > 0:
+                        return res
+                    repo_folder_name = res['value']
+                    repo_path = os.path.join(self.repos_path, repo_folder_name)
+
+            os.makedirs(repo_path)
+        else:
+            repo_path = os.path.abspath(i_repo_path)
+        logger.info(f"""New repo path: {repo_path}""")
+
+        #check if it has MLC meta
+        meta_file = os.path.join(repo_path, "meta.yaml")
+        if not os.path.exists(meta_file):
+            meta = {}
+            meta['uid'] = utils.get_new_uid()['uid']
+            meta['alias'] = repo_folder_name
+            meta['git'] = True
+            utils.save_yaml(meta_file, meta)
+        else:
+            meta = utils.read_yaml(meta_file)
+        self.register_repo(repo_path, meta)
+
+        return {'return': 0}
+
+    def conflicting_repo(self, repo_meta):
+        for repo_object in self.repos:
+            if repo_object.meta.get('uid', '') == '':
+                return {"return": 1, "error": f"UID is not present in file 'meta.yaml' in the repo path {repo_object.path}"}
+            if repo_meta["uid"] == repo_object.meta.get('uid', ''):
+                if repo_meta['path'] == repo_object.path:
+                    return {"return": 1, "error": f"Same repo is already registered"}
+                else:
+                    return {"return": 1, "error": f"Conflicting with repo in the path {repo_object.path}", "conflicting_path": repo_object.path}
+        return {"return": 0}
+    
+    def register_repo(self, repo_path, repo_meta):
+    
+        if repo_meta.get('deps'):
+            for dep in repo_meta['deps']:
+                self.pull_repo(dep['url'], branch=dep.get('branch'), checkout=dep.get('checkout'))
+
+        # Get the path to the repos.json file in $HOME/MLC
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
+
+        with open(repos_file_path, 'r') as f:
+            repos_list = json.load(f)
+        
+        if repo_path not in repos_list:
+            repos_list.append(repo_path)
+            logger.info(f"Added new repo path: {repo_path}")
+
+        with open(repos_file_path, 'w') as f:
+            json.dump(repos_list, f, indent=2)
+            logger.info(f"Updated repos.json at {repos_file_path}")
+        return {'return': 0}
+
+    def unregister_repo(self, repo_path):
+        logger.info(f"Unregistering the repo in path {repo_path}")
+        repos_file_path = os.path.join(self.repos_path, 'repos.json')
+
+        with open(repos_file_path, 'r') as f:
+            repos_list = json.load(f)
+        
+        if repo_path in repos_list:
+            repos_list.remove(repo_path)
+            with open(repos_file_path, 'w') as f:
+                json.dump(repos_list, f, indent=2)  
+            logger.info(f"Path: {repo_path} has been removed.")
+        else:
+            logger.info(f"Path: {repo_path} not found in {repos_file_path}. Nothing to be unregistered!")
+        return {'return': 0}
+
+    def find(self, run_args):
+        try:
+            # Get repos_list using the existing method
+            repos_list = self.load_repos_and_meta()
+            if(run_args.get('item', run_args.get('artifact'))):
+                repo = run_args.get('item', run_args.get('artifact'))
+            else:
+                repo = run_args.get('repo', run_args.get('item', run_args.get('artifact')))
+
+            # Check if repo is None or empty
+            if not repo:
+                return {"return": 1, "error": "Please enter a Repo Alias, Repo UID, or Repo URL in one of the following formats:\n"
+                                         "- <repo_owner>@<repos_name>\n"
+                                         "- <repo_url>\n"
+                                         "- <repo_uid>\n"
+                                         "- <repo_alias>\n"
+                                         "- <repo_alias>,<repo_uid>"}
+
+            # Handle the different repo input formats
+            repo_name = None
+            repo_uid = None
+
+            # Check if the repo is in the format of a repo UID (alphanumeric string)
+            if self.is_uid(repo):
+                repo_uid = repo
+            if "," in repo:
+                repo_split = repo.split(",")
+                repo_name = repo_split[0]
+                if len(repo_split) > 1:
+                    repo_uid = repo_split[1]
+            elif "@" in repo:
+                repo_name = repo
+            elif "github.com" in repo:
+                result = self.github_url_to_user_repo_format(repo)
+                if result["return"] == 0:
+                    repo_name = result["value"]
+                else:
+                    return result
+            
+            # Check if repo_name exists in repos.json
+            matched_repo_path = None
+            for repo_obj in repos_list:
+                if repo_name and repo_name == os.path.basename(repo_obj.path) :
+                    matched_repo_path = repo_obj
+                    break
+
+            # Search through self.repos for matching repos
+            lst = []
+            for i in self.repos:
+                if repo_uid and i.meta['uid'] == repo_uid:
+                    lst.append(i)
+                elif repo_name == i.meta['alias']:
+                    lst.append(i)
+                elif self.is_uid(repo) and not any(i.meta['uid'] == repo_uid for i in self.repos):
+                    return {"return": 1, "error": f"No repository with UID: '{repo_uid}' was found"}
+                elif "," in repo and not matched_repo_path and not any(i.meta['uid'] == repo_uid for i in self.repos) and not any(i.meta['alias'] == repo_name for i in self.repos):
+                    return {"return": 1, "error": f"No repository with alias: '{repo_name}' and UID: '{repo_uid}' was found"}
+                elif not matched_repo_path and not any(i.meta['alias'] == repo_name for i in self.repos) and not any(i.meta['uid'] == repo_uid for i in self.repos ):
+                    return {"return": 1, "error": f"No repository with alias: '{repo_name}' was found"}
                 
-        return {'return': 0, 'list': lst}
+            # Append the matched repo path
+            if(len(lst)==0):
+                lst.append(matched_repo_path)
+            
+            return {'return': 0, 'list': lst}
+        except Exception as e:
+            # Return error message if any exception occurs
+            return {"return": 1, "error": str(e)}
 
     def github_url_to_user_repo_format(self, url):
         """
@@ -1038,10 +1298,12 @@ class RepoAction(Action):
                     logger.warning(f"The repo to be cloned has conflict with the repo already in the path: {is_conflict['conflicting_path']}")
                     logger.warning(f"The repo currently being pulled will be registered in repos.json and already existing one would be unregistered.")
                     self.unregister_repo(is_conflict['conflicting_path'])
-                    self.register_repo(meta_data)
+                    self.register_repo(repo_path, meta_data)
                     return {"return": 0}
             else:         
-                self.register_repo(meta_data)
+                r = self.register_repo(repo_path, meta_data)
+                if r['return'] > 0:
+                    return r
                 return {"return": 0}
 
         except subprocess.CalledProcessError as e:
@@ -1051,7 +1313,7 @@ class RepoAction(Action):
 
     def pull(self, run_args):
         repo_url = run_args.get('repo', run_args.get('url', 'repo'))
-        if repo_url == "repo":
+        if not repo_url or repo_url == "repo":
             for repo_object in self.repos:
                 repo_folder_name = os.path.basename(repo_object.path)
                 if "@" in repo_folder_name:
@@ -1097,7 +1359,6 @@ class RepoAction(Action):
             logger.info("Checking whether the repo was registered in repos.json")
         else:
             logger.warning(f"Repo {run_args['repo']} was not found in the repo folder. repos.json will be checked for any corrupted entry. If any, that will be removed.")
-
         self.unregister_repo(repo_path)
 
         return {"return": 0}
@@ -1114,13 +1375,67 @@ class ScriptAction(Action):
     def search(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
-        return self.parent.search(i)
+        res = self.parent.search(i)
+        #print(res)
+        return res
+
+    find = search
 
     def rm(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
         logger.debug(f"Removing script with input: {i}")
         return self.parent.rm(i)
+
+    def show(self, run_args):
+        self.action_type = "script"
+        res = self.search(run_args)
+        logger.info(f"Showing script with tags: {run_args.get('tags')}")
+        script_meta_keys_to_show = ["uid", "alias", "tags", "new_env_keys", "new_state_keys", "cache"]
+        for item in res['list']:
+            print(f"""Location: {item.path}:
+Main Script Meta:""")
+            for key in script_meta_keys_to_show:
+                if key in item.meta:
+                    print(f"""    {key}: {item.meta[key]}""")
+            if "input_mapping" in item.meta:
+                print("    Input mapping:")
+                utils.printd(item.meta["input_mapping"], begin_spaces=8)
+            print("......................................................")
+            print(f"""For full script meta, see meta file at {os.path.join(item.path, "meta.yaml")}""")
+            print("")
+            
+        return {'return': 0}
+
+    def add(self, i):
+        """
+        Adds a new script to the repository.
+
+        Args:
+            i (dict): Input dictionary with the following keys:
+                - item_repo (tuple): Repository alias and UID (default: local repo).
+                - item (str): Item alias and optional UID in "alias,uid" format.
+                - tags (str): Comma-separated tags.
+                - yaml (bool): Whether to save metadata in YAML format. Defaults to JSON.
+
+        Returns:
+            dict: Result of the operation with 'return' code and error/message if applicable.
+        """
+        # Determine repository
+        if i.get('details'):
+            item = i['details']
+        else:
+            item = i.get('item')
+        if not item:
+            return {'return': 1, 'error': f"""No script item given to add. Please use mlc add script <repo_name>:<script_name> --tags=<script_tags> format to add a script to a given repo"""}
+        ii = {}
+        ii['target'] = "script"
+        ii['src_tags'] = i.get("template_tags", "template,generic")
+        ii['dest'] = item
+        ii['tags'] = i.get('tags', [])
+        res =  self.cp(ii)
+
+        return res
 
     def dynamic_import_module(self, script_path):
         # Validate the script_path
@@ -1209,6 +1524,7 @@ class CacheAction(Action):
         i['target_name'] = "cache"
         #logger.debug(f"Searching for cache with input: {i}")
         return self.parent.search(i)
+
     find = search
 
     def rm(self, i):
@@ -1230,6 +1546,8 @@ Cache Meta:""")
                     print(f"""    {key}: {item.meta[key]}""")
             print("""Cached State:""")
             cached_state_meta_file = os.path.join(item.path, "mlc-cached-state.json")
+            if not os.path.exists(cached_state_meta_file):
+                continue
             try:
                 # Load and parse the JSON file containing the cached state
                 with open(cached_state_meta_file, 'r') as file:
@@ -1254,6 +1572,13 @@ Cache Meta:""")
         return {'return': 0}
 
 class ExperimentAction(Action):
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
+
     def show(self, args):
         logger.info(f"Showing experiment with identifier: {args.details}")
         return {'return': 0}
@@ -1264,6 +1589,13 @@ class ExperimentAction(Action):
 
 
 class CfgAction(Action):
+    def __init__(self, parent=None):
+        if parent is None:
+            parent = default_parent
+        #super().__init__(parent)
+        self.parent = parent
+        self.__dict__.update(vars(parent))
+
     def load(self, args):
         """
         Load the configuration.
@@ -1332,14 +1664,15 @@ if default_parent is None:
     default_parent = Action()
 
 def process_console_output(res, target, action, run_args):
-    if action == "find":
+    if action in ["find", "search"]:
+        if "list" not in res:
+            logger.error("'list' entry not found in find result")
+            return  # Exit function if there's an error
         if len(res['list']) == 0:
-            logger.warn(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
+            logger.warning(f"""No {target} entry found for the specified input: {run_args}!""")
         else:
             for item in res['list']:
                 logger.info(f"""Item path: {item.path}""")
-
-
 
 # Main CLI function
 def main():
@@ -1349,16 +1682,8 @@ def main():
     # The chosen subcommand will be stored in the "command" attribute of the parsed arguments.
     subparsers = parser.add_subparsers(dest='command', required=True)
 
-    for action in ['pull']:
-        # Pull parser - handles repo URLs directly
-        # The chosen subcommand will be stored in the "pull" attribute of the parsed arguments.
-        pull_parser = subparsers.add_parser('pull', help='Pull a repository by URL or target.')
-        pull_parser.add_argument('target', choices=['repo'], help='Target type (repo).')
-        pull_parser.add_argument('repo', nargs='?', help='Repo to pull in URL format or owner@repo_name format for github repos')
-        pull_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
-
     # Script and Cache-specific subcommands
-    for action in ['run', 'test', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
+    for action in ['run', 'pull', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
@@ -1390,14 +1715,16 @@ def main():
     run_args = res['args_dict']
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
-
-
-    if args.command in ['rm']:
+        
+    if args.command in ['pull', 'rm', 'add', 'find']:
         if args.target == "repo":
             run_args['repo'] = args.details
   
     if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
         run_args['tags'] = args.details
+
+    if not run_args.get('details') and args.details:
+        run_args['details'] = args.details
 
     if args.command in ["cp", "mv"]:
         run_args['target'] = args.target
@@ -1416,7 +1743,7 @@ def main():
             logger.error(res.get('error', f"Error in {action}"))
         process_console_output(res, args.target, args.command, run_args)
     else:
-        logger.info(f"Error: '{args.command}' is not supported for {args.target}.")
+        logger.error(f"Error: '{args.command}' is not supported for {args.target}.")
 
 if __name__ == '__main__':
     main()

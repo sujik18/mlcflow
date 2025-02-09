@@ -344,7 +344,7 @@ def save_json(file_name, meta):
         return {'return': 1, 'error': str(e)}
 
 
-def save_yaml(file_name, meta):
+def save_yaml(file_name, meta, sort_keys=True):
     """
     Saves the provided meta data to a YAML file.
 
@@ -359,7 +359,7 @@ def save_yaml(file_name, meta):
     """
     try:
         with open(file_name, 'w') as f:
-            yaml.dump(meta, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(meta, f, default_flow_style=False, sort_keys=sort_keys)
         return {'return': 0, 'error': ''}
     except Exception as e:
         return {'return': 1, 'error': str(e)}
@@ -424,6 +424,17 @@ def convert_args_to_dictionary(inp):
                 args_dict[char] = True
 
     return {'return': 0, 'args_dict': args_dict}
+
+def is_valid_url(url):
+    pattern = re.compile(
+        r"^(https?|ftp)://"  # Protocol (http, https, ftp)
+        r"(\S+:\S+@)?"  # Optional username:password@
+        r"([a-zA-Z0-9.-]+)"  # Domain
+        r"(:\d{2,5})?"  # Optional port
+        r"(/[\S]*)?$",  # Path
+        re.IGNORECASE
+    )
+    return re.match(pattern, url) is not None
 
 
 def sub_input(i, keys, reverse=False):
