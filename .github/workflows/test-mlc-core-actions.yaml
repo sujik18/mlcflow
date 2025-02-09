@@ -107,7 +107,7 @@ jobs:
     - name: Test 5 - find cache - Cache not present
       run: |
         mlc find cache --tags=detect,os 2>&1 | tee test5.log
-        if ! grep -q "No cache entry found for the specified tags:" test5.log; then
+        if ! grep -q "No cache entry found for the specified input:" test5.log; then
           exit 1
         fi
 
@@ -145,5 +145,36 @@ jobs:
       run: |
         rm -r $HOME/MLC/repos/mlcommons@mlperf-automations
         mlc rm repo mlcommons@mlperf-automations
-        mlc pull repo mlcommons@mlperf-automations
+        mlc pull repo mlcommons@mlperf-automations --branch=dev
         
+    - name: Test 13 - add script - Add a new MLC script
+      run: |
+        mlc add script my-script-1 --tags=my,new-tags-1
+        mlc add script my-script-2 --tags=my,new-tags-2
+        mlc add script my-script-3 --tags=my,new-tags3 --template_tags=detect,os
+        mlc add script mlcommons@mlperf-automations:my-script-4 --tags=my,new-tags4 --template_tags=detect,os
+      
+    - name: Test 14 - mv script - Move/rename an MLC script 
+      run: |
+        mlc mv script my-script-1 moved-my-script-1
+        mlc mv script my-script-2 mlcommons@mlperf-automations:moved-my-script-2 
+    
+    - name: Test 15 - show script
+      run: |
+        mlc show script --tags=run-mlperf,inference
+        mlc show script 863735b7db8c44fc
+        mlc show script detect-os,863735b7db8c44fc
+        mlc show script detect-os
+
+    - name: Test 16 - find script
+      run: |
+        mlc find script --tags=run-mlperf,inference
+        mlc find script 863735b7db8c44fc
+        mlc find script detect-os,863735b7db8c44fc
+        mlc find script detect-os
+
+    - name: Test 17 - rm script
+      run: |
+        mlc rm script detect-os
+        mlc rm script --tags=detect,cpu
+    

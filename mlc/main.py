@@ -353,7 +353,7 @@ class Action:
         """
 
         # Parse item details
-        item = i.get("item",i.get('artifact'))
+        item = i.get("item",i.get('artifact', i.get('details')))
         item_name, item_id, item_tags = (None, None, None)
         if item:
             item_parts = item.split(",")
@@ -380,6 +380,8 @@ class Action:
         target_name = i.get('target_name', self.action_type)
         inp['target_name'] = target_name
         res = self.search(inp)
+        if res['return'] > 0:
+            return res
 
         if len(res['list']) == 0:
             return {'return': 16, 'error': f'No {target_name} found for {inp}'}
@@ -559,17 +561,20 @@ class Action:
         choice = 0
         if len(res['list']) == 0:
             return {'return': 1, 'error': f'No {action_target} found for {src_item}'}
-        elif len(res['list']) > 1 and not i.get("quiet"):
+        elif len(res['list']) > 1 and not run_args.get("quiet"):
             print(f"More than one {action_target} found for {src_item}:")
 
             # Display available options
             for idx, item in enumerate(res['list'], start=1):
-                print(f"{idx}. {item}")
+                print(f"{idx}. {item.path}")
 
             # Ask user to choose an item
             while True:
+                choice = input("Select the correct one (enter number, default=1): ").strip()
+                if choice == "":
+                    choice = 1
                 try:
-                    choice = int(input("Select the correct one (enter number): ")) - 1
+                    choice = int(choice) - 1
                     if 0 <= choice < len(res['list']):
                         break
                     else:
@@ -605,7 +610,7 @@ class Action:
             return res
 
         ii = {}
-        ii['meta'] = result.meta
+        ii['meta'] = result.meta.copy()
         if action_target == "script":
             ii['yaml'] = True
 
@@ -624,11 +629,13 @@ class Action:
 
         res = self.save_new_meta(ii, item_id, target_item_name, action_target, target_item_path, target_repo)
 
+        dest_item = Item(target_item_path, target_repo)
+        
         if res['return'] > 0:
             return res
         logger.info(f"{action_target} {src_item_path} copied to {target_item_path}")
 
-        return {'return': 0}
+        return {'return': 0, 'src': result, 'dest': dest_item}
 
     def copy_item(self, source_path, destination_path):
         try:
@@ -644,6 +651,27 @@ class Action:
 
         return {'return': 0}
 
+    def mv(self, run_args):
+        target_name = run_args['target']
+        res = self.cp(run_args)
+        if res['return'] > 0:
+            return res
+        src = res['src']
+        dest = res['dest']
+        ii = {}
+        ii['item'] = src.meta['uid']
+        res = self.rm(ii)
+        if res['return'] > 0:
+            return res
+        
+        #Put the src uid to the destination path
+        dest.meta['uid'] = src.meta['uid']
+        dest._save_meta()
+        self.index.update(dest.meta, target_name, dest.path, dest.repo)
+        logger.info(f"""Item with uid {dest.meta['uid']} successfully moved from {src.path} to {dest.path}""")
+
+        return {'return': 0, 'src': src, 'dest': dest}
+
     def search(self, i):
         indices = self.index.indices
         target = i.get('target_name', self.action_type)
@@ -651,12 +679,44 @@ class Action:
         result = []
         uid = i.get("uid")
         alias = i.get("alias")
+        item_repo = i.get('item_repo')
+        if not uid and not alias and i.get('details'):
+            details = i['details']
+            details_split = details.split(",")
+            if len(details_split) > 1:
+                alias = details_split[0]
+                uid = details_split[1]
+            else:
+                if self.is_uid(details_split[0]):
+                    uid = details_split[0]
+                else:
+                    alias = details_split[0]
+
+        if alias and ":" in alias:
+            alias_split = alias.split(":")
+            alias = alias_split[1]
+            item_repo = alias_split[0]
         folder_name = i.get("folder_name")
         found = False
+
+        if item_repo:
+            res = self.access(
+                {
+                    "action": "find",
+                    "target": "repo",
+                    "repo": f"{item_repo}"    
+                }
+            )
+            if res["return"] > 0:
+                return res
+            if len(res['list']) == 0:
+                return {'return': 1, 'error': f"""No repo found for {item_repo}"""}
+            item_repo = res['list'][0]
+
         if target_index:
             if uid or alias:
                 for res in target_index:
-                    if res["uid"] == uid or (alias and res["alias"] == alias):
+                    if (res["uid"] == uid or (alias and res["alias"] == alias)) and (not item_repo or item_repo == res['repo']):
                         it = Item(res['path'], res['repo'])
                         result.append(it)
                         found = True
@@ -666,7 +726,7 @@ class Action:
                             it = Item(res['path'], res['repo'])
                             #result.append(it)
             else:
-                tags= i.get("tags")
+                tags = i.get("tags")
                 tags_split = tags.split(",")
                 if target == "script":
                     non_variation_tags = [t for t in tags_split if not t.startswith("_")]
@@ -685,6 +745,7 @@ class Action:
                         result.append(it)
         return {'return': 0, 'list': result}
 
+    find = search
 
 
 class Index:
@@ -747,7 +808,7 @@ class Index:
         uid = meta['uid']
         index = self.get_index(folder_type, uid)
         if index == -1: 
-            logger.warn(f"Index is not having the {folder_type} item {path}")
+            logger.warning(f"Index is not having the {folder_type} item {path}")
         else:
             del(self.indices[folder_type][index])
 
@@ -875,6 +936,15 @@ class Item:
             self.meta = utils.read_json(json_file)
         else:
             logger.info(f"No meta file found in {self.path} for {self.meta}")
+
+    def _save_meta(self):
+        yaml_file = os.path.join(self.path, "meta.yaml")
+        json_file = os.path.join(self.path, "meta.json")
+
+        if os.path.exists(yaml_file):
+            utils.save_yaml(yaml_file, self.meta)
+        elif os.path.exists(json_file):
+            utils.save_json(json_file, self.meta)
 
 
 class Repo:
@@ -1279,13 +1349,37 @@ class ScriptAction(Action):
     def search(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
-        return self.parent.search(i)
+        res = self.parent.search(i)
+        #print(res)
+        return res
+
+    find = search
 
     def rm(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
         logger.debug(f"Removing script with input: {i}")
         return self.parent.rm(i)
+
+    def show(self, run_args):
+        self.action_type = "script"
+        res = self.search(run_args)
+        logger.info(f"Showing script with tags: {run_args.get('tags')}")
+        script_meta_keys_to_show = ["uid", "alias", "tags", "new_env_keys", "new_state_keys", "cache"]
+        for item in res['list']:
+            print(f"""Location: {item.path}:
+Main Script Meta:""")
+            for key in script_meta_keys_to_show:
+                if key in item.meta:
+                    print(f"""    {key}: {item.meta[key]}""")
+            if "input_mapping" in item.meta:
+                print("    Input mapping:")
+                utils.printd(item.meta["input_mapping"], begin_spaces=8)
+            print("......................................................")
+            print(f"""For full script meta, see meta file at {os.path.join(item.path, "meta.yaml")}""")
+            print("")
+            
+        return {'return': 0}
 
     def add(self, i):
         """
@@ -1296,7 +1390,6 @@ class ScriptAction(Action):
                 - item_repo (tuple): Repository alias and UID (default: local repo).
                 - item (str): Item alias and optional UID in "alias,uid" format.
                 - tags (str): Comma-separated tags.
-                - new_tags (str): Additional comma-separated tags to add.
                 - yaml (bool): Whether to save metadata in YAML format. Defaults to JSON.
 
         Returns:
@@ -1309,18 +1402,10 @@ class ScriptAction(Action):
             item = i.get('item')
         if not item:
             return {'return': 1, 'error': f"""No script item given to add. Please use mlc add script <repo_name>:<script_name> --tags=<script_tags> format to add a script to a given repo"""}
-            
-        if ":" in item:
-            item_split = item.split(":")
-            item_repo = item_split[0]
-            item = item_split[1]
-        else:
-            item_repo = i.get("item_repo", self.local_repo)
-
         ii = {}
         ii['target'] = "script"
         ii['src_tags'] = i.get("template_tags", "template,generic")
-        ii['dest'] = f"""{item_repo}:{item}"""
+        ii['dest'] = item
         ii['tags'] = i.get('tags', [])
         res =  self.cp(ii)
 
@@ -1413,6 +1498,7 @@ class CacheAction(Action):
         i['target_name'] = "cache"
         #logger.debug(f"Searching for cache with input: {i}")
         return self.parent.search(i)
+
     find = search
 
     def rm(self, i):
@@ -1552,12 +1638,12 @@ if default_parent is None:
     default_parent = Action()
 
 def process_console_output(res, target, action, run_args):
-    if action == "find":
+    if action in ["find", "search"]:
         if "list" not in res:
             logger.error("'list' entry not found in find result")
             return  # Exit function if there's an error
         if len(res['list']) == 0:
-            logger.warn(f"""No {target} entry found for the specified tags: {run_args['tags']}!""")
+            logger.warning(f"""No {target} entry found for the specified input: {run_args}!""")
         else:
             for item in res['list']:
                 logger.info(f"""Item path: {item.path}""")
@@ -1629,6 +1715,7 @@ def main():
         res = method(run_args)
         if res['return'] > 0:
             logger.error(res.get('error', f"Error in {action}"))
+            raise Exception(f"""An error occurred {res}""")
         process_console_output(res, args.target, args.command, run_args)
     else:
         logger.info(f"Error: '{args.command}' is not supported for {args.target}.")
