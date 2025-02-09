@@ -351,6 +351,7 @@ class Action:
         Returns:
             dict: Result of the operation with 'return' code and error/message if applicable.
         """
+        inp = {}
 
         # Parse item details
         item = i.get("item",i.get('artifact', i.get('details')))
@@ -363,10 +364,15 @@ class Action:
         elif i.get('tags'):
             item_tags = i['tags']
         else:
-            return {'return': 1, 'error': 'Item not given for rm action'}
+            if i.get('target_name', self.action_type) != "cache":
+                return {'return': 1, 'error': 'Item not given for rm action'}
+            else:
+                inp['fetch_all'] = True
 
+        # Check force remove is set to True
+        # Setting force remove to true would lead to removal of assets without user prompt
+        force_remove = True if i.get('f') else False
 
-        inp = {}
         if item_name:
             inp['alias'] = item_name
             inp['folder_name'] = item_name #we dont know if the user gave the alias or the folder name, we first check for alias and then the folder name
@@ -391,9 +397,11 @@ class Action:
                 for idx, item in enumerate(res["list"]):
                     logger.info(f"{idx}. Path: {item.path}, Meta: {item.meta}")
 
-                user_choice = input("Would you like to proceed with all items? (yes/no): ").strip().lower()
-                if user_choice not in ['yes', 'y']:
-                    return {'return': 1, 'error': "Operation aborted by user."}
+                if not force_remove:
+                    user_choice = input("Would you like to proceed with all items? (yes/no): ").strip().lower()
+                    if user_choice in ['yes', 'y']:
+                        force_remove = True
+                    
         results = res['list']
         
         for result in results:
@@ -402,7 +410,15 @@ class Action:
         
         
             if os.path.exists(item_path):
-                shutil.rmtree(item_path)
+                if force_remove == True:
+                    shutil.rmtree(item_path)
+                else:
+                    user_choice = input(f"Confirm to delete {target_name} item: {item_path}? (yes/no): ").strip().lower()
+                    if user_choice not in ['yes', 'y']:
+                        continue
+                    else:
+                        shutil.rmtree(item_path)
+
                 logger.info(f"{target_name} item: {item_path} has been successfully removed")
 
             self.index.rm(item_meta, target_name, item_path)
@@ -680,6 +696,15 @@ class Action:
         uid = i.get("uid")
         alias = i.get("alias")
         item_repo = i.get('item_repo')
+        fetch_all = True if i.get('fetch_all') else False
+
+        # For targets like cache, sometimes user would need to clear the entire cache folder present in the system
+        # this helps to fetch entire data pertaining to particular target
+        if fetch_all:
+            for res in target_index:
+                result.append(Item(res['path'], res['repo']))
+            return {'return': 0, 'list': result}
+
         if not uid and not alias and i.get('details'):
             details = i['details']
             details_split = details.split(",")
@@ -1693,6 +1718,11 @@ def main():
     if args.command in ['pull', 'rm', 'add', 'find']:
         if args.target == "repo":
             run_args['repo'] = args.details
+        if args.target == "script":
+            print(args.extra)
+            print(args.details)
+            if args.extra:
+                pass
   
     if hasattr(args, 'details') and args.details and "," in args.details and not run_args.get("tags") and args.target in ["script", "cache"]:
         run_args['tags'] = args.details
@@ -1711,14 +1741,14 @@ def main():
     action = get_action(args.target)
     # Dynamically call the method (e.g., run, list, show)
     if action and hasattr(action, args.command):
+        print(run_args)
         method = getattr(action, args.command)
         res = method(run_args)
         if res['return'] > 0:
             logger.error(res.get('error', f"Error in {action}"))
-            raise Exception(f"""An error occurred {res}""")
         process_console_output(res, args.target, args.command, run_args)
     else:
-        logger.info(f"Error: '{args.command}' is not supported for {args.target}.")
+        logger.error(f"Error: '{args.command}' is not supported for {args.target}.")
 
 if __name__ == '__main__':
     main()
