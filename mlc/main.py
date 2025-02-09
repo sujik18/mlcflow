@@ -1746,6 +1746,7 @@ def main():
         res = method(run_args)
         if res['return'] > 0:
             logger.error(res.get('error', f"Error in {action}"))
+            raise Exception(f"""An error occurred {res}""")
         process_console_output(res, args.target, args.command, run_args)
     else:
         logger.error(f"Error: '{args.command}' is not supported for {args.target}.")
