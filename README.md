@@ -57,10 +57,10 @@ Each target has its own set of specific actions to tailor automation workflows a
 
 | Target | Action          |
 |--------|-----------------|
-| script    | run, find/search, rm, mv, cp, add, test, docker, show , dynamic_import_module          |
+| script    | run, find/search, rm, mv, cp, add, test, docker, show ,         |
 | cache    | find/search, rm, show  |
-| repo    | pull, search, rm, list, find/search , register_repo , unregister_repo , add         |
-|  cfg     |      load          |
+| repo    | pull, search, rm, list, find/search , register_repo , unregister_repo , add repo        |
+
 
 
 ## CM compatibility layer
