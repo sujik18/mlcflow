@@ -1,0 +1,52 @@
+site_name: MLCFlow Documentation
+repo_url: https://github.com/mlcommons/mlcflow
+theme:
+  name: material
+  logo: img/logo_v2.svg
+  favicon: img/logo_v2.svg
+  palette:
+    primary: deep purple
+    accent: green
+  features:
+    - content.tabs.link
+    - content.code.copy
+    - navigation.expand
+    - navigation.sections
+    - navigation.indexes
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - toc.follow
+nav:
+  - Home:
+    - README.md
+  - Install:
+    - install/install.md
+  - MLC CLI:
+    - Repo:
+      - targets/repo/index.md
+    - Script:
+      - targets/script/index.md
+    - Cache:
+      - targets/cache/index.md
+
+markdown_extensions:
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.details
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+plugins:
+  - search
+  - macros
+  - site-urls
