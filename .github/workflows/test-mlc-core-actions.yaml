@@ -68,7 +68,7 @@ jobs:
         mlc find repo https://github.com/mlcommons/mlperf-automations.git
         mlc find repo 9cf241afa6074c89
         mlc find repo mlcommons@mlperf-automations
-        mlc find repo 9cf241afa6074c89,mlcommons@mlperf-automations
+        mlc find repo mlcommons@mlperf-automations,9cf241afa6074c89
       
     - name: Test 3 - pull repo - Test conflicting repo scenario
       run: |
