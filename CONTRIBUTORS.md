@@ -33,6 +33,7 @@ Once your contribution exceeds 50 lines of code (in total), we will:
 - **[Shaik Masthan](https://github.com/csemasthan)** - *Initial Development Discussions*  
 - **[Sahil Avaran](https://github.com/sahilavaran)** - *Initial Development Discussions*, added logging
 - **[R.A Sidharth](https://github.com/Sid9993)** - *Find repo implementation*
+- **[Sujith Kanakkassery](https://github.com/sujik18)** - *Initial Development Discussions*, adding logging to a file
 - **[Your Name Here]** - This could be you! 🎉  
 
 ---

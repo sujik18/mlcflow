@@ -130,7 +130,7 @@ mlc cp script <registered_mlc_source_repo_name>:<source_script_name> <registered
 
 * `registered_mlc_source/target_repo_name` is of the format `repo_owner`@`repo_name`.
 
-Examples of `c=` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
+Examples of `cp` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
 
 ## Run
 
@@ -150,4 +150,28 @@ mlcr <list_of_tags_matching_to_particular_script> <input_flags>
 
 * `input_flags` are the additional input that could be given to a particular script. They are specified in the format `--<name_of_input_flag>=<value>`. Some of the examples could be found in run commands from inference documentation [here](https://docs.mlcommons.org/inference/benchmarks/language/gpt-j/).
 
-Examples of `c=` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
+Examples of `run` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
+
+## Docker
+
+`docker` script is used to run scripts inside a container environment.
+
+**Syntax**
+
+```bash
+mlc docker script --tags=<list_of_tags_matching_to_particular_script> <input_flags>
+```
+
+* `input_flags` are the additional input that could be given to a particular script. They are specified in the format `--<name_of_input_flag>=<value>`. Some of the examples could be found in run commands from inference documentation [here](https://docs.mlcommons.org/inference/benchmarks/language/gpt-j/).
+
+## Test
+
+`test` script is used to test run scripts. Note that `test` action could only be performed for scripts where `tests` section is configured in `meta.yaml`
+
+**Syntax**
+
+```bash
+mlc test script --tags=<list_of_tags_matching_to_particular_script>
+```
+
+* Please click [here](https://github.com/mlcommons/mlperf-automations/blob/0e647d7126e610d010a21dbfccca097febe80af9/script/get-generic-sys-util/meta.yaml#L24) to find the example script where the tests are being defined.

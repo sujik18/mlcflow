@@ -16,6 +16,9 @@ source mlcflow/bin/activate
 ```
 
 ## Install MLCFLow
+
+If you are not using virtual ENV for installation, the latest `pip` install requires the `--break-system-packages` flag while installing.
+
 === "Use the latest stable release"
     ```bash
      pip install mlcflow
@@ -28,6 +31,6 @@ source mlcflow/bin/activate
 
 Now, you are ready to use the `mlc` commands. Currently, `mlc` is being used to automating the benchmark runs for:
 
-* [MLCOMMONS MLPerf Inference](https://docs.mlcommons.org/inference/)
-* [MLCOMMONS MLPerf Automotive]()
-* [MLCOMMONS MLPerf Training]()
+* [MLPerf Inference](https://docs.mlcommons.org/inference/)
+* [MLPerf Automotive]()
+* [MLPerf Training]()
