@@ -546,7 +546,8 @@ class Action:
 
     def cp(self, run_args):
         action_target = run_args['target']
-
+        if action_target != "script":
+            return {"return": 1, "error": f"The {action_target} target is not currently supported for mv/cp actions"}
         inp = {}
         src_item = run_args.get('src')
         src_tags = None
@@ -611,6 +612,9 @@ class Action:
                 if not self.current_repo_path:
                     return {'return': 1, 'error': f"""Current directory is not inside a registered MLC repo and so using ".:" is not valid"""}
                 target_repo = self.current_repo_path
+            else:
+                if not any(os.path.basename(repodata.path) == target_repo for repodata in self.repos):
+                    return {'return': 1, 'error': f"""The target repo {target_repo} is not registered in MLC. Either register in MLC by cloning from Git through command `mlc pull repo` or create repo using `mlc add repo` command and try to rerun the command again"""}
             target_repo_path = os.path.join(self.repos_path, target_repo)
             target_repo = Repo(target_repo_path)
             target_item_name = target_split[1].strip()
@@ -669,6 +673,8 @@ class Action:
 
     def mv(self, run_args):
         target_name = run_args['target']
+        if target_name != "script":
+            return {"return": 1, "error": f"The {target_name} target is not currently supported for mv/cp actions"}
         res = self.cp(run_args)
         if res['return'] > 0:
             return res
@@ -753,7 +759,10 @@ class Action:
                             #result.append(it)
             else:
                 tags = i.get("tags")
-                tags_split = tags.split(",")
+                if tags:
+                    tags_split = tags.split(",")
+                else:
+                    return {"return":1, "error": f"Tags are not specifeid for completing the specific action"}
                 if target == "script":
                     non_variation_tags = [t for t in tags_split if not t.startswith("_")]
                     tags_to_match = non_variation_tags
@@ -1390,6 +1399,8 @@ class ScriptAction(Action):
     def show(self, run_args):
         self.action_type = "script"
         res = self.search(run_args)
+        if res['return'] > 0:
+            return res
         logger.info(f"Showing script with tags: {run_args.get('tags')}")
         script_meta_keys_to_show = ["uid", "alias", "tags", "new_env_keys", "new_state_keys", "cache"]
         for item in res['list']:
@@ -1741,6 +1752,7 @@ def main():
         res = method(run_args)
         if res['return'] > 0:
             logger.error(res.get('error', f"Error in {action}"))
+            raise Exception(f"""An error occurred {res}""")
         process_console_output(res, args.target, args.command, run_args)
     else:
         logger.error(f"Error: '{args.command}' is not supported for {args.target}.")
