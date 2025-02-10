@@ -1,6 +1,6 @@
 **MLCFlow: Simplifying MLPerf Automations**
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-green)](LICENSE.md)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green)](https://github.com/mlcommons/mlcflow/blob/main/LICENSE.md)
 [![Downloads](https://static.pepy.tech/badge/mlcflow)](https://pepy.tech/project/mlcflow)
 
 [![MLC core actions test](https://github.com/mlcommons/mlcflow/actions/workflows/test-mlc-core-actions.yaml/badge.svg)](https://github.com/mlcommons/mlcflow/actions/workflows/test-mlc-core-actions.yaml)
@@ -9,11 +9,11 @@
 [![MLPerf inference bert (deepsparse, tf, onnxruntime, pytorch)](https://github.com/mlcommons/mlcflow/actions/workflows/mlperf-inference-bert.yml/badge.svg)](https://github.com/mlcommons/mlcflow/actions/workflows/mlperf-inference-bert.yml)
 
 
-MLCFlow is a versatile CLI and Python interface developed by MLCommons in collaboration with a dedicated team of volunteers (see [Contributors](CONTRIBUTORS.md)). It serves as a streamlined replacement for the [CMind](https://github.com/mlcommons/ck/tree/master/cm) tool, designed to drive the automation workflows of MLPerf benchmarks more efficiently. 
+MLCFlow is a versatile CLI and Python interface developed by MLCommons in collaboration with a dedicated team of volunteers (see [Contributors](https://github.com/mlcommons/mlcflow/blob/main/CONTRIBUTORS.md)). It serves as a streamlined replacement for the [CMind](https://github.com/mlcommons/ck/tree/master/cm) tool, designed to drive the automation workflows of MLPerf benchmarks more efficiently. 
 
 The concept behind CMind originated from **Grigori Fursin**, while the **MLPerf Automations** project was created by **Grigori Fursin** and **Arjun Suresh**, whose collective contributions laid the foundation for modernizing MLPerf benchmarking tools.
 
-On February 9, 2025, MLCFlow is releasing its first stable version, 1.0.0. This milestone was led by **Arjun Suresh** and **Anandhu Sooraj**, with support from the [MLCFlow community](CONTRIBUTORS.md).
+On February 9, 2025, MLCFlow is releasing its first stable version, 1.0.0. This milestone was led by **Arjun Suresh** and **Anandhu Sooraj**, with support from the [MLCFlow community](https://github.com/mlcommons/mlcflow/blob/main/CONTRIBUTORS.md).
 
 ### Key Features
 Building upon the core idea of CMind—wrapping native scripts with Python wrappers and YAML metadata—MLCFlow focuses exclusively on key automation components: **Scripts**, along with its complementary modules: **Cache**, **Docker**, and **Experiments**. This targeted design simplifies both implementation and interface, enabling a more user-friendly experience.
