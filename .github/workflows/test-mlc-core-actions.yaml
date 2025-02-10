@@ -62,8 +62,15 @@ jobs:
           exit 1
         fi
 
+    - name: Test 2 - find repo
+      run: |
+        mlc find repo anandhu-eng@mlperf-automations
+        mlc find repo https://github.com/mlcommons/mlperf-automations.git
+        mlc find repo 9cf241afa6074c89
+        mlc find repo mlcommons@mlperf-automations
+        mlc find repo 9cf241afa6074c89,mlcommons@mlperf-automations
       
-    - name: Test 2 - pull repo - Test conflicting repo scenario
+    - name: Test 3 - pull repo - Test conflicting repo scenario
       run: |
         GH_MLC_REPO_PATH="${HOME}/MLC/repos/mlcommons@mlperf-automations"
         GH_MLC_REPO_JSON_PATH="${HOME}/MLC/repos/repos.json"
@@ -91,11 +98,11 @@ jobs:
         fi
         mlc pull repo
     
-    - name: Test 3 - list repo - List the existing repositories
+    - name: Test 4 - list repo - List the existing repositories
       run: |
         mlc list repo
 
-    - name: Test  4 - rm repo - Remove the forked mlperf-automation repo
+    - name: Test  5 - rm repo - Remove the forked mlperf-automation repo
       run: |
         GH_MLC_REPO_PATH_FORK="${HOME}/MLC/repos/anandhu-eng@mlperf-automations"
         mlc rm repo anandhu-eng@mlperf-automations
@@ -104,76 +111,76 @@ jobs:
           exit 1
         fi
 
-    - name: Test 5 - find cache - Cache not present
+    - name: Test 6 - find cache - Cache not present
       run: |
         mlc find cache --tags=detect,os 2>&1 | tee test5.log
         if ! grep -q "No cache entry found for the specified input:" test5.log; then
           exit 1
         fi
 
-    - name: Test 6 - run script - Output being used for testing mlc cache
+    - name: Test 7 - run script - Output being used for testing mlc cache
       run: |
         mlc run script --tags=get,imagenet-aux --quiet
         mlc run script --tags=get,imagenet-aux,_from.dropbox --quiet
 
-    - name: Test 7 - find cache - More than one cache present
+    - name: Test 8 - find cache - More than one cache present
       run: |
         mlc search cache --tags=get,imagenet-aux 2>&1 | tee test7.log
         if grep -q "No cache entry found for the specified tags:" test7.log; then
           exit 1
         fi
       
-    - name: Test 8 - show cache - More than one cache present
+    - name: Test 9 - show cache - More than one cache present
       run: |
         mlc show cache --tags=get,imagenet-aux 2>&1 | tee test7.log
 
-    - name: Test 9 - rm cache - More than one cache present
+    - name: Test 10 - rm cache - More than one cache present
       run: |
         mlc rm cache --tags=get,imagenet-aux 2>&1 --all | tee test7.log
 
-    - name: Test 10 - cp script - Copy mlc script 
+    - name: Test 11 - cp script - Copy mlc script 
       run: |
         mlc cp script detect-os my-os-detect
 
-    - name: Test 11 - add repo - Add a new MLC repo 
+    - name: Test 12 - add repo - Add a new MLC repo 
       run: |
         mlc add repo my-new-repo
         mlc add repo https://github.com/mlcommons/inference
         mlc add repo https://mygit.com/myrepo
       
-    - name: Test 12 - rm repo where we have a corrupt entry 
+    - name: Test 13 - rm repo where we have a corrupt entry 
       run: |
         rm -r $HOME/MLC/repos/mlcommons@mlperf-automations
         mlc rm repo mlcommons@mlperf-automations
         mlc pull repo mlcommons@mlperf-automations --branch=dev
         
-    - name: Test 13 - add script - Add a new MLC script
+    - name: Test 14 - add script - Add a new MLC script
       run: |
         mlc add script my-script-1 --tags=my,new-tags-1
         mlc add script my-script-2 --tags=my,new-tags-2
         mlc add script my-script-3 --tags=my,new-tags3 --template_tags=detect,os
         mlc add script mlcommons@mlperf-automations:my-script-4 --tags=my,new-tags4 --template_tags=detect,os
       
-    - name: Test 14 - mv script - Move/rename an MLC script 
+    - name: Test 15 - mv script - Move/rename an MLC script 
       run: |
         mlc mv script my-script-1 moved-my-script-1
         mlc mv script my-script-2 mlcommons@mlperf-automations:moved-my-script-2 
     
-    - name: Test 15 - show script
+    - name: Test 16 - show script
       run: |
         mlc show script --tags=run-mlperf,inference
         mlc show script 863735b7db8c44fc
         mlc show script detect-os,863735b7db8c44fc
         mlc show script detect-os
 
-    - name: Test 16 - find script
+    - name: Test 17 - find script
       run: |
         mlc find script --tags=run-mlperf,inference
         mlc find script 863735b7db8c44fc
         mlc find script detect-os,863735b7db8c44fc
         mlc find script detect-os
 
-    - name: Test 17 - rm script
+    - name: Test 18 - rm script
       run: |
         mlc rm script get-ipol-src -f
         mlc rm script --tags=app,image,corner-detection -f
