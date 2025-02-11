@@ -91,7 +91,7 @@ class Action:
             method = getattr(action, action_name)
             result = method(options)
             #logger.info(f"result ={result}")
-             return result
+            return result
         else:
             return {'return': 1, 'error': f"'{action_name}' action is not supported for {action_target}."}
         return {'return': 0}
