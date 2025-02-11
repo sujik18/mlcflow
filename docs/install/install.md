@@ -10,19 +10,19 @@ MLCFlow needs `python>=3.7`, `python3-pip`, `python3-venv` and `git` installed o
 
 === "Ubuntu"
     ```bash
-sudo apt-get install -y python3-dev python3-venv python3-pip git wget sudo unzip
+    sudo apt-get install -y python3-dev python3-venv python3-pip git wget sudo unzip
     ```
 === "RedHat"
     ```bash
-sudo dnf install -y python3-dev python3-pip git wget sudo unzip binutils
+    sudo dnf install -y python3-dev python3-pip git wget sudo unzip binutils
     ```
 === "Arch"
     ```bash
-sudo pacman -Sy python python-pip git wget sudo binutils
+    sudo pacman -Sy python python-pip git wget sudo binutils
     ```
 === "macOS"
     ```bash
-brew install python git wget binutils
+    brew install python git wget binutils
     ```
 === "Windows"
     
