@@ -185,6 +185,15 @@ jobs:
         mlc rm script get-ipol-src -f
         mlc rm script --tags=app,image,corner-detection -f
         mlc rm script 63080407db4d4ac4 -f
+
+    - name: Test 19 - list script
+      run: |
+        mlc list script
+    
+    - name: Test 20 - list cache
+      run: |
+        mlc list cache
+    
     
     - name: Test 21 - Test autoremoval of corrupt entries from repos.json while running a script
       run: |
