@@ -1515,7 +1515,21 @@ Main Script Meta:""")
 
 
     def list(self, args):
-        logger.info("Listing all scripts.")
+        self.action_type = "script"
+        run_args = {"fetch_all": True}  # to fetch the details of all the scripts present in repos registered  in mlc
+        
+        res = self.search(run_args)
+        if res['return'] > 0:
+            return res
+        
+        logger.info(f"Listing all the scripts and their paths present in repos which are registered in MLC")
+        print("......................................................")
+        for item in res['list']:
+            print(f"alias: {item.meta['alias'] if item.meta.get('alias') else 'None'}")
+            print(f"Location: {item.path}")
+            print("......................................................")
+
+        return {"return": 0}
 
 
 class ScriptExecutionError(Exception):
@@ -1579,7 +1593,20 @@ Cache Meta:""")
         return {'return': 0}
 
     def list(self, args):
-        logger.info("Listing all caches.")
+        self.action_type = "cache"
+        run_args = {"fetch_all": True}  # to fetch the details of all the caches generated
+        
+        res = self.search(run_args)
+        if res['return'] > 0:
+            return res
+        
+        logger.info(f"Listing all the caches and their paths")
+        print("......................................................")
+        for item in res['list']:
+            print(f"tags: {item.meta['tags'] if item.meta.get('tags') else 'None'}")
+            print(f"Location: {item.path}")
+            print("......................................................")
+
         return {'return': 0}
 
 class ExperimentAction(Action):
