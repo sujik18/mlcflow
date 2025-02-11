@@ -84,20 +84,16 @@ class Action:
         action_target_split = action_target.split(",")
         action_target = action_target_split[0]
 
-        action = actions.get(action_target)
-
         action = get_action(action_target, self)
-        if action:
-            if hasattr(action, action_name):
-                # Find the method and call it with the options
-                method = getattr(action, action_name)
-                result = method(self, options)
-                #logger.info(f"result ={result}")
-                return result
-            else:
-                return {'return': 1, 'error': f"'{action_name}' action is not supported for {action_target}."}
+
+        if action and hasattr(action, action_name):
+            # Find the method and call it with the options
+            method = getattr(action, action_name)
+            result = method(options)
+            #logger.info(f"result ={result}")
+             return result
         else:
-            return {'return': 1, 'error': f"Action target '{action_target}' is not defined."}
+            return {'return': 1, 'error': f"'{action_name}' action is not supported for {action_target}."}
         return {'return': 0}
 
     def find_target_folder(self, target):
