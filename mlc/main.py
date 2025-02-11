@@ -173,7 +173,7 @@ class Action:
 
             # Check if meta.yaml exists
             if not os.path.isfile(meta_yaml_path):
-                logger.warning(f"{meta_yaml_path} not found. Is it a MLC repo? Skipping...")
+                logger.warning(f"{meta_yaml_path} not found. Could be due to accidental deletion of meta.yaml. Try to stash the changes or reclone by doing `rm repo` and `pull repo`. Skipping...")
                 # logger.warning(f"Deleting the {meta_yaml_path} entry from repos.json")
                 # res = self.access(
                 #     {
