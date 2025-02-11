@@ -44,18 +44,15 @@ source mlcflow/bin/activate
 
 If you are not using virtual ENV for installation, the latest `pip` install requires the `--break-system-packages` flag while installing.
 
-=== "Use the latest stable release"
-    ```bash
-     pip install mlcflow
-    ```
-=== "To use mlcflow with latest changes"
-    Fetches the latest changes developers are working on from the `dev` branch.
-    ```bash
-     pip install git+https://github.com/mlcommons/mlcflow.git@dev
-    ```
+```bash
+   pip install mlcflow
+```
 
-Now, you are ready to use the `mlc` commands. Currently, `mlc` is being used to automating the benchmark runs for:
+> [!IMPORTANT]  
+> If you want to pull the latest changes (recommended), please do `mlc pull repo` after the installation.
+
+
+Now, you are ready to use the `mlc` commands. Currently, `mlc` is being used to automate the benchmark runs for:
 
 * [MLPerf Inference](https://docs.mlcommons.org/inference/)
-* [MLPerf Automotive]()
-* [MLPerf Training]()
+
