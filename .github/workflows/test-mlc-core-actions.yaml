@@ -186,3 +186,8 @@ jobs:
         mlc rm script --tags=app,image,corner-detection -f
         mlc rm script 63080407db4d4ac4 -f
     
+    - name: Test 21 - Test autoremoval of corrupt entries from repos.json while running a script
+      run: |
+        rm -r $HOME/MLC/repos/mlcommons@mlperf-automations
+        mlc run script --tags=detect,os
+        mlc pull repo mlcommons@mlperf-automations
