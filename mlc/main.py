@@ -148,7 +148,17 @@ class Action:
         # Iterate through the list of repository paths
         for repo_path in repo_paths:
             if not os.path.exists(repo_path):
-                logger.warning(f"""Warning: {repo_path} not found. Consider doing `mlc rm repo {repo_path}`. Skipping...""")
+                logger.warning(f"""Warning: {repo_path} not found. Considering it as a corrupt entry and deleting automatically...""")
+                logger.warning(f"Deleting the {meta_yaml_path} entry from repos.json")
+                res = self.access(
+                    {
+                        "automation": "repo",
+                        "action": "rm",
+                        "repo": f"{os.path.basename(repo_path)}"    
+                    }
+                )
+                if res["return"] > 0:
+                    return res
                 continue
 
             if is_curdir_inside_path(repo_path):
@@ -163,17 +173,17 @@ class Action:
 
             # Check if meta.yaml exists
             if not os.path.isfile(meta_yaml_path):
-                logger.warning(f"{meta_yaml_path} not found. Skipping...")
-                logger.warning(f"Deleting the {meta_yaml_path} entry from repos.json")
-                res = self.access(
-                    {
-                        "automation": "repo",
-                        "action": "rm",
-                        "repo": f"{os.path.basename(repo_path)}"    
-                    }
-                )
-                if res["return"] > 0:
-                    return res
+                logger.warning(f"{meta_yaml_path} not found. Is it a MLC repo? Skipping...")
+                # logger.warning(f"Deleting the {meta_yaml_path} entry from repos.json")
+                # res = self.access(
+                #     {
+                #         "automation": "repo",
+                #         "action": "rm",
+                #         "repo": f"{os.path.basename(repo_path)}"    
+                #     }
+                # )
+                # if res["return"] > 0:
+                #     return res
                 continue
 
             # Load the YAML file
