@@ -28,6 +28,8 @@ nav:
       - targets/repo/index.md
     - Script:
       - targets/script/index.md
+      - Script execution flow:
+        - targets/script/script-flow/index.md
     - Cache:
       - targets/cache/index.md
 
