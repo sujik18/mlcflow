@@ -136,7 +136,7 @@ jobs:
 
     - name: Test 10 - rm cache - More than one cache present
       run: |
-        mlc rm cache --tags=get,imagenet-aux -f 2>&1 --all | tee test7.log
+        mlc rm cache --tags=get,imagenet-aux -f
 
     - name: Test 11 - cp script - Copy mlc script 
       run: |
