@@ -162,6 +162,7 @@ mlc run script --tags=detect,os -j
 
 <details>
   <summary><strong>Example Output</strong> 📌</summary>
+```bash
 arjun@intel-spr-i9:~$ mlcr detect,os -j
 [2025-02-14 03:11:38,706 module.py:574 INFO] - * mlcr detect,os
 [2025-02-14 03:11:38,708 module.py:5354 INFO] -        ! cd /home/arjun
@@ -238,7 +239,8 @@ arjun@intel-spr-i9:~$ mlcr detect,os -j
     "os_uname_all": "Linux intel-spr-i9 6.8.0-51-generic #52-Ubuntu SMP PREEMPT_DYNAMIC Thu Dec  5 13:09:44 UTC 2024 x86_64 x86_64 x86_64 GNU/Linux"
   },
   "deps": []
-}    
+}
+```
 </details> 
 ---
 
