@@ -572,7 +572,7 @@ class Action:
 
         choice = 0
         if len(res['list']) == 0:
-            return {'return': 1, 'error': f'No {action_target} found for {src_id'}
+            return {'return': 1, 'error': f'No {action_target} found for {src_id}'}
         elif len(res['list']) > 1 and not run_args.get("quiet"):
             print(f"More than one {action_target} found for {src_id}:")
 
