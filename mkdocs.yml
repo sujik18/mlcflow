@@ -30,14 +30,14 @@ nav:
       - targets/script/index.md
     - CacheAction:
       - targets/cache/index.md
-  - MLC Scripts:
+  - MLC Script:
     - Script execution flow:
-      - targets/script/script-flow/index.md
+      - targets/script/script-flow.md
     - Script meta:
-      - targets/script/script-meta-inf/index.md
-  - Docker Scripts:
+      - targets/script/script-meta.md
+  - Docker Script:
     - targets/script/docker.md
-  - Test Scripts:
+  - Test Script:
     - targets/script/test.md
 
 markdown_extensions:
