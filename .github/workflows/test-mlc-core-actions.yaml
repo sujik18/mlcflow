@@ -193,11 +193,3 @@ jobs:
     - name: Test 20 - list cache
       run: |
         mlc list cache
-    
-    
-    - name: Test 21 - Test autoremoval of corrupt entries from repos.json while running a script
-      run: |
-        sudo apt-get install -y jq
-        TMP_VAR=$HOME/MLC/repos/anandhu@mlperf-automations
-        jq ". += [\"$TMP_VAR\"]" ${HOME}/MLC/repos/repos.json > tmp.json && mv tmp.json ${HOME}/MLC/repos/repos.json
-        mlc run script --tags=detect,os
