@@ -124,6 +124,17 @@ mlc cp script <user@source_repo>:script <user@target_repo>:script
 
 ---
 
+## **Remove (`rm`)**  
+
+Deletes one or more scripts from MLC repositories.  
+
+**Example Command:**  
+```bash
+mlc rm script --tags=detect,os -f
+```
+
+---
+
 ## **Run**  
 
 Executes a script from an MLC repository.  
@@ -132,6 +143,25 @@ Executes a script from an MLC repository.
 ```bash
 mlc run script --tags=detect,os -j
 ```
+
+**Options:**  
+- `-j`: Shows the output in a JSON format
+- `mlcr` can be used as a shortcut to `mlc run script --tags=`
+- `--input`:
+- `--path`:
+- `--outdirname`:
+- `--new`:
+- `--force_cache`:
+- `--version`:
+- `--version_max`:
+- `--version_min`:
+- `--quiet`:
+- `--silent`:
+- `-v`:
+- *`<Individual script inputs>`: In addition to the above options an `mlcr` command also takes any input specified with in a script meta in `input_mappings` as its input.  
+
+<details>
+  <summary><strong>Example Output</strong> 📌</summary>
 
 ---
 
@@ -161,13 +191,3 @@ mlc test script --tags=benchmark
 
 ---
 
-## **Remove (`rm`)**  
-
-Deletes one or more scripts from MLC repositories.  
-
-**Example Command:**  
-```bash
-mlc rm script --tags=detect,os -f
-```
-
----
