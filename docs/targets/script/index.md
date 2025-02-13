@@ -162,7 +162,7 @@ mlc run script --tags=detect,os -j
 
 <details>
   <summary><strong>Example Output</strong> 📌</summary>
-```bash
+  ```bash
 arjun@intel-spr-i9:~$ mlcr detect,os -j
 [2025-02-14 03:11:38,706 module.py:574 INFO] - * mlcr detect,os
 [2025-02-14 03:11:38,708 module.py:5354 INFO] -        ! cd /home/arjun
@@ -240,8 +240,9 @@ arjun@intel-spr-i9:~$ mlcr detect,os -j
   },
   "deps": []
 }
-```
+  ```
 </details> 
+
 ---
 
 ## **Docker Execution**  
