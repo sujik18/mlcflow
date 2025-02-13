@@ -557,13 +557,14 @@ class Action:
         
             if self.is_uid(src_item):
                 inp['uid'] = src_item
-
+            src_id = src_item
         else:
             #src_tags must be there
             if not run_args.get("src_tags"):
                 return {'return': 1, 'error': 'Either "src" or "src_tags" must be provided as an input for cp method'}
             src_tags = run_args['src_tags']
             inp['tags'] = src_tags
+            src_id = src_tags
 
         inp['target_name'] = action_target
 
@@ -571,9 +572,9 @@ class Action:
 
         choice = 0
         if len(res['list']) == 0:
-            return {'return': 1, 'error': f'No {action_target} found for {src_item}'}
+            return {'return': 1, 'error': f'No {action_target} found for {src_id'}
         elif len(res['list']) > 1 and not run_args.get("quiet"):
-            print(f"More than one {action_target} found for {src_item}:")
+            print(f"More than one {action_target} found for {src_id}:")
 
             # Display available options
             for idx, item in enumerate(res['list'], start=1):
