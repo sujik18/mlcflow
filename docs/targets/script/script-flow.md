@@ -1,4 +1,4 @@
-# MLC "script" execution flow
+# MLC script
 
 ## Understanding MLC scripts
 
