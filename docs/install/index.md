@@ -56,8 +56,8 @@ If you are not using virtual ENV for installation, the latest `pip` install requ
 pip install mlcflow
 ```
 
-> [!IMPORTANT]  
-> If you want to pull the latest changes (recommended), please do `mlc pull repo` after the installation.
+!!! tip
+    If you want to pull the latest changes (recommended), please do `mlc pull repo` after the installation.
 
 
 Now, you are ready to use the `mlc` commands. Currently, `mlc` is being used to automate the benchmark runs for:
