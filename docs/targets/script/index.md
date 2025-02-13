@@ -1,177 +1,173 @@
-# Script
+# **Script Action**  
 
-Currently, the following actions are supported for script:
+The following actions are supported for managing scripts in **MLCFlow**.  
 
-## Find
+---
 
-`find` action is used to list the path of partiicular scripts present in MLC repos registered in MLC.
+## **Syntax Variations**  
 
-**Syntax**
+MLC scripts can be identified in different ways:  
 
+1. **Using tags:** `--tags=<comma-separated-tags>` (e.g., `--tags=detect,os`)  
+2. **Using alias:** `<script_alias>` (e.g., `detect-os`)  
+3. **Using UID:** `<script_uid>` (e.g., `5b4e0237da074764`)  
+4. **Using both alias and UID:** `<script_alias>,<script_uid>` (e.g., `detect-os,5b4e0237da074764`)  
+
+!!! note  
+    For simplicity, syntax variations are only shown for the `find` action, but similar options apply to all other actions.  
+
+---
+
+## **Find**  
+
+The `find` action retrieves the path of scripts available in MLC repositories.  
+
+### **Syntax Variations**  
+
+| Command Format | Example Usage |
+|---------------|--------------|
+| `mlc find script --tags=<tags>` | `mlc find script --tags=detect,os` |
+| `mlc find script <script_alias>` | `mlc find script detect-os` |
+| `mlc find script <script_uid>` | `mlc find script 5b4e0237da074764` |
+| `mlc find script <script_alias>,<script_uid>` | `mlc find script detect-os,5b4e0237da074764` |
+
+<details>
+  <summary><strong>Example Output</strong> 📌</summary>
+
+  ```bash
+  arjun@intel-spr-i9:~$ mlc find script --tags=detect,os -j
+  [2025-02-14 02:55:12,999 main.py:1686 INFO] - Item path: /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/detect-os
+  ```
+</details>  
+
+🔹 **Example usage:** [GitHub Workflow](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml)  
+
+---
+
+## **Show**  
+
+Retrieves the path and metadata of scripts in MLC repositories.  
+
+**Example Command:**  
 ```bash
-mlc find script --tags=<list_of_tags_matching_to_particular_script>
+mlc show script --tags=detect,os
 ```
 
-OR
+<details>
+  <summary><strong>Example Output</strong> 📌</summary>
 
+  ```bash
+  arjun@intel-spr-i9:~$ mlc show script --tags=detect,os
+  [2025-02-14 02:56:16,604 main.py:1404 INFO] - Showing script with tags: detect,os
+  Location: /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/detect-os:
+  Main Script Meta:
+      uid: 863735b7db8c44fc
+      alias: detect-os
+      tags: ['detect-os', 'detect', 'os', 'info']
+      new_env_keys: ['MLC_HOST_OS_*', '+MLC_HOST_OS_*', 'MLC_HOST_PLATFORM_*', 'MLC_HOST_PYTHON_*', 'MLC_HOST_SYSTEM_NAME', 'MLC_RUN_STATE_DOCKER', '+PATH']
+      new_state_keys: ['os_uname_*']
+  ......................................................
+  For full script meta, see meta file at /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/detect-os/meta.yaml
+  ```
+</details>  
+
+---
+
+## **Add**  
+
+Creates a new script in a registered MLC repository.  
+
+**Example Command:**  
 ```bash
-mlc find script <script_alias>
+mlc add script <user@repo>:new_script --tags=benchmark
 ```
 
-OR
+**Options:**  
+- `--template_tags`: A comma-separated list of tags to create a new MLC script based on existing templates.  
 
+<details>
+  <summary><strong>Example Output</strong> 📌</summary>
+
+  ```bash
+  arjun@intel-spr-i9:~$ mlc add script gateoverflow@mlperf-automations --tags=benchmark --template_tags=app,mlperf,inference
+  More than one script found for None:
+  1. /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/app-mlperf-inference-mlcommons-python
+  2. /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/app-mlperf-inference-ctuning-cpp-tflite
+  3. /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/app-mlperf-inference
+  4. /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/app-mlperf-inference-mlcommons-cpp
+  Select the correct one (enter number, default=1): 1
+  [2025-02-14 02:58:33,453 main.py:664 INFO] - Folder successfully copied from /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/app-mlperf-inference-mlcommons-python to /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/gateoverflow@mlperf-automations
+  ```
+</details>  
+
+---
+
+## **Move (`mv`)**  
+
+Transfers a script between repositories or renames a script within the same repository.  
+
+**Example Command:**  
 ```bash
-mlc find script <script_uid>
+mlc mv script <user@source_repo>:script <user@target_repo>:script
 ```
 
-OR
+---
 
+## **Copy (`cp`)**  
+
+Duplicates a script between repositories or within the same repository.  
+
+**Example Command:**  
 ```bash
-mlc find script <script_alias>,<script_uid>
+mlc cp script <user@source_repo>:script <user@target_repo>:script
 ```
 
-Examples of `find` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
+---
 
-## Show
+## **Run**  
 
-`show` action is used to list the path and meta data of partiicular scripts present in MLC repos registered in MLC.
+Executes a script from an MLC repository.  
 
-**Syntax**
-
+**Example Command:**  
 ```bash
-mlc show script --tags=<list_of_tags_matching_to_particular_script>
+mlc run script --tags=detect,os -j
 ```
 
-OR
+---
 
+## **Docker Execution**  
+
+Runs scripts inside a **containerized environment**.  
+
+📌 Please refer to the [Docker README](#) for the full list of Docker options for MLC scripts.  
+
+**Example Command:**  
 ```bash
-mlc show script <script_alias>
+mlc docker script --tags=detect,os -j
 ```
 
-OR
+---
 
+## **Test**  
+
+Validates scripts configured with a `tests` section in `meta.yaml`.  
+
+**Example Command:**  
 ```bash
-mlc show script <script_uid>
+mlc test script --tags=benchmark
 ```
 
-OR
+🔹 **Example of test configuration:** [Meta.yaml Example](https://github.com/mlcommons/mlperf-automations/blob/0e647d7126e610d010a21dbfccca097febe80af9/script/get-generic-sys-util/meta.yaml#L24)  
 
+---
+
+## **Remove (`rm`)**  
+
+Deletes one or more scripts from MLC repositories.  
+
+**Example Command:**  
 ```bash
-mlc show script <script_alias>,<script_uid>
+mlc rm script --tags=detect,os -f
 ```
 
-Examples of `show` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
-
-## Rm
-
-`rm` action is used to remove one/more scripts present in repos which are registered in MLC.
-
-**Syntax**
-
-```bash
-mlc rm script --tags=<list_of_tags_matching_to_particular_script>
-```
-
-OR
-
-```bash
-mlc rm script <script_alias>
-```
-
-OR
-
-```bash
-mlc rm script <script_uid>
-```
-
-`-f` could be used to force remove scripts. Without `-f`, user would be prompted for confirmation to delete a script.
-
-Examples of `rm` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
-
-## Add
-
-`add` script is used to add a new script to any of the registered MLC repos.
-
-**Syntax**
-
-```bash
-mlc add script <registered_mlc_repo_name>:<new_script_name> --tags=<set_of_tags> --template=<set_of_tags>
-```
-
-* `--tags` contains set of tags to identify the newly created script.
-* `--template` contains set of tags of the template script from which we are creating the new script. If not specified, default [template](https://github.com/mlcommons/mlperf-automations/tree/main/script/template-script) would be considered.
-* `registered_mlc_repo_name` is of the format `repo_owner`@`repo_name`.
-
-Examples of `add` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
-
-## Mv
-
-`mv` script is used to move a script from source repo to destination repo.
-
-**Syntax**
-
-```bash
-mlc mv script <registered_mlc_source_repo_name>:<source_script_name> <registered_mlc_target_repo_name>:<source_script_name> 
-```
-
-* `registered_mlc_source/target_repo_name` is of the format `repo_owner`@`repo_name`.
-
-Examples of `mv` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
-
-## Cp
-
-`cp` script is used to copy a script from source repo to destination repo.
-
-**Syntax**
-
-```bash
-mlc cp script <registered_mlc_source_repo_name>:<source_script_name> <registered_mlc_target_repo_name>:<source_script_name> 
-```
-
-* `registered_mlc_source/target_repo_name` is of the format `repo_owner`@`repo_name`.
-
-Examples of `cp` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
-
-## Run
-
-`run` script is used to run scripts from any of the repos registered in MLC.
-
-**Syntax**
-
-```bash
-mlc run script --tags=<list_of_tags_matching_to_particular_script> <input_flags>
-```
-
-OR
-
-```bash
-mlcr <list_of_tags_matching_to_particular_script> <input_flags>
-```
-
-* `input_flags` are the additional input that could be given to a particular script. They are specified in the format `--<name_of_input_flag>=<value>`. Some of the examples could be found in run commands from inference documentation [here](https://docs.mlcommons.org/inference/benchmarks/language/gpt-j/).
-
-Examples of `run` action for `script` target could be found inside the GitHub action workflow [here](https://github.com/mlcommons/mlcflow/blob/d0269b47021d709e0ffa7fe0db8c79635bfd9dff/.github/workflows/test-mlc-core-actions.yaml).
-
-## Docker
-
-`docker` script is used to run scripts inside a container environment.
-
-**Syntax**
-
-```bash
-mlc docker script --tags=<list_of_tags_matching_to_particular_script> <input_flags>
-```
-
-* `input_flags` are the additional input that could be given to a particular script. They are specified in the format `--<name_of_input_flag>=<value>`. Some of the examples could be found in run commands from inference documentation [here](https://docs.mlcommons.org/inference/benchmarks/language/gpt-j/).
-
-## Test
-
-`test` script is used to test run scripts. Note that `test` action could only be performed for scripts where `tests` section is configured in `meta.yaml`
-
-**Syntax**
-
-```bash
-mlc test script --tags=<list_of_tags_matching_to_particular_script>
-```
-
-* Please click [here](https://github.com/mlcommons/mlperf-automations/blob/0e647d7126e610d010a21dbfccca097febe80af9/script/get-generic-sys-util/meta.yaml#L24) to find the example script where the tests are being defined.
+---
