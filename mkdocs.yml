@@ -32,7 +32,8 @@ nav:
       - targets/cache/index.md
   - MLC Script:
     - targets/script/index.md
-    - targets/script/script-meta.md
+    - targets/script/execution-flow.md
+    - targets/script/meta.md
     - targets/script/docker.md
     - targets/script/test.md
 
