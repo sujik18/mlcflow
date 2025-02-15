@@ -1409,7 +1409,7 @@ class ScriptAction(Action):
         return res
 
     find = search
-
+        
     def rm(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"

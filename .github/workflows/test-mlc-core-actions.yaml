@@ -9,7 +9,7 @@ on:
       - '!**.md'
 
 jobs:
-  test_mlc_core_actions:
+  test_mlc_cli_core_actions:
 
     runs-on: ${{ matrix.os }}
     strategy:
@@ -193,3 +193,50 @@ jobs:
     - name: Test 20 - list cache
       run: |
         mlc list cache
+
+  test_mlc_access_core_actions:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.8"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        exclude:
+          - os: windows-latest
+          - os: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Configure git longpaths (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        git config --system core.longpaths true
+
+    - name: Install mlcflow from the pull request's source repository and branch
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --ignore-installed --verbose pip setuptools
+        python -m pip install .
+    
+    - name: Pull a forked mlperf-automations repository
+      run: |
+        mlc pull repo anandhu-eng@mlperf-automations  --checkout=dev
+    
+    - name: Run find repo from test-mlc-access.py
+      run: |
+        cd .github/scripts && python -c "import test_mlc_access as test; test.test_find_repo()"
+
+    - name: Pull MLCOMMONS mlperf-automations repository
+      run: |
+        mlc pull repo mlcommons@mlperf-automations --checkout=dev
+
+    - name: Run tests from test-mlc-access.py
+      run: |
+        cd .github/scripts && python -c "import test_mlc_access as test; test.run_tests()"
+
