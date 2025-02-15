@@ -25,8 +25,13 @@ MLCFlow needs `python>=3.7`, `python3-pip`, `python3-venv` and `git` installed o
     brew install python git wget binutils curl
     ```
 === "Windows"
+
+    WinGet the Windows Package Manager is available on Windows 11, modern versions of Windows 10, and Windows Server 2025 as a part of the App Installer. For more information visit mirosoft's [site](https://learn.microsoft.com/en-us/windows/package-manager/winget/).
+
+    ```bash
+    winget install wget Git.Git python3 cURL.cURL unzip --accept-package-agreements
+    ```
     
-    TBD
     
 
     
@@ -44,7 +49,7 @@ This step is not mandatory. But the latest `pip` install requires this or else w
 === "Windows"
     ```bash
     python3 -m venv mlcflow
-    mlc\Scripts\activate.bat
+    mlcflow\Scripts\activate.bat
     git config --system core.longpaths true
     ```
 
