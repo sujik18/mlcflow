@@ -1268,12 +1268,12 @@ class RepoAction(Action):
                 logger.info(f"Repository {repo_name} already exists at {repo_path}. Checking for local changes...")
     
                 # Check for local changes
-                status_command = ['git', '-C', repo_path, 'status', '--porcelain']
+                status_command = ['git', '-C', repo_path, 'status', '--porcelain', '--untracked-files=no']
                 local_changes = subprocess.run(status_command, capture_output=True, text=True)
 
-                if local_changes.stdout:
+                if local_changes.stdout.strip():
                     logger.warning("There are local changes in the repository. Please commit or stash them before checking out.")
-                    return {"return": 1, "error": f"Local changes detected in the already existing repository: {repo_path}"}
+                    return {"return": 0, "warning": f"Local changes detected in the already existing repository: {repo_path}, skipping the pull"}
                 else:
                     logger.info("No local changes detected. Fetching latest changes...")
                     subprocess.run(['git', '-C', repo_path, 'fetch'], check=True)
@@ -1308,9 +1308,9 @@ class RepoAction(Action):
                     return {"return": 0}
                 else:
                     logger.warning(f"The repo to be cloned has conflict with the repo already in the path: {is_conflict['conflicting_path']}")
-                    logger.warning(f"The repo currently being pulled will be registered in repos.json and already existing one would be unregistered.")
                     self.unregister_repo(is_conflict['conflicting_path'])
                     self.register_repo(repo_path, meta_data)
+                    logger.warning(f"{repo_path} is registered in repos.json and {is_conflict['conflicting_path']} is unregistered.")
                     return {"return": 0}
             else:         
                 r = self.register_repo(repo_path, meta_data)
