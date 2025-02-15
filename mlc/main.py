@@ -63,9 +63,6 @@ class Action:
     #mlc = None
     repos = [] #list of Repo objects
 
-    def execute(self, args):
-        raise NotImplementedError("Subclasses must implement the execute method")
-
     # Main access function to simulate a Python interface for CLI
     def access(self, options):
         """
@@ -87,19 +84,16 @@ class Action:
         action_target_split = action_target.split(",")
         action_target = action_target_split[0]
 
-        action = actions.get(action_target)
+        action = get_action(action_target, self)
 
-        if action:
-            if hasattr(action, action_name):
-                # Find the method and call it with the options
-                method = getattr(action, action_name)
-                result = method(self, options)
-                #logger.info(f"result ={result}")
-                return result
-            else:
-                return {'return': 1, 'error': f"'{action_name}' action is not supported for {action_target}."}
+        if action and hasattr(action, action_name):
+            # Find the method and call it with the options
+            method = getattr(action, action_name)
+            result = method(options)
+            #logger.info(f"result ={result}")
+            return result
         else:
-            return {'return': 1, 'error': f"Action target '{action_target}' is not defined."}
+            return {'return': 1, 'error': f"'{action_name}' action is not supported for {action_target}."}
         return {'return': 0}
 
     def find_target_folder(self, target):
@@ -148,7 +142,17 @@ class Action:
         # Iterate through the list of repository paths
         for repo_path in repo_paths:
             if not os.path.exists(repo_path):
-                logger.warning(f"""Warning: {repo_path} not found. Consider doing `mlc rm repo {repo_path}`. Skipping...""")
+                logger.warning(f"""Warning: {repo_path} not found. Considering it as a corrupt entry and deleting automatically...""")
+                logger.warning(f"Deleting the {meta_yaml_path} entry from repos.json")
+                res = self.access(
+                    {
+                        "automation": "repo",
+                        "action": "rm",
+                        "repo": f"{os.path.basename(repo_path)}"    
+                    }
+                )
+                if res["return"] > 0:
+                    return res
                 continue
 
             if is_curdir_inside_path(repo_path):
@@ -163,17 +167,7 @@ class Action:
 
             # Check if meta.yaml exists
             if not os.path.isfile(meta_yaml_path):
-                logger.warning(f"{meta_yaml_path} not found. Skipping...")
-                logger.warning(f"Deleting the {meta_yaml_path} entry from repos.json")
-                res = self.access(
-                    {
-                        "automation": "repo",
-                        "action": "rm",
-                        "repo": f"{os.path.basename(repo_path)}"    
-                    }
-                )
-                if res["return"] > 0:
-                    return res
+                logger.warning(f"{meta_yaml_path} not found. Could be due to accidental deletion of meta.yaml. Try to stash the changes or reclone by doing `rm repo` and `pull repo`. Skipping...")
                 continue
 
             # Load the YAML file
@@ -563,13 +557,14 @@ class Action:
         
             if self.is_uid(src_item):
                 inp['uid'] = src_item
-
+            src_id = src_item
         else:
             #src_tags must be there
             if not run_args.get("src_tags"):
                 return {'return': 1, 'error': 'Either "src" or "src_tags" must be provided as an input for cp method'}
             src_tags = run_args['src_tags']
             inp['tags'] = src_tags
+            src_id = src_tags
 
         inp['target_name'] = action_target
 
@@ -577,9 +572,9 @@ class Action:
 
         choice = 0
         if len(res['list']) == 0:
-            return {'return': 1, 'error': f'No {action_target} found for {src_item}'}
+            return {'return': 1, 'error': f'No {action_target} found for {src_id}'}
         elif len(res['list']) > 1 and not run_args.get("quiet"):
-            print(f"More than one {action_target} found for {src_item}:")
+            print(f"More than one {action_target} found for {src_id}:")
 
             # Display available options
             for idx, item in enumerate(res['list'], start=1):
@@ -1272,8 +1267,18 @@ class RepoAction(Action):
                 subprocess.run(clone_command, check=True)
 
             else:
-                logger.info(f"Repository {repo_name} already exists at {repo_path}. Pulling latest changes...")
-                subprocess.run(['git', '-C', repo_path, 'pull'], check=True)
+                logger.info(f"Repository {repo_name} already exists at {repo_path}. Checking for local changes...")
+    
+                # Check for local changes
+                status_command = ['git', '-C', repo_path, 'status', '--porcelain']
+                local_changes = subprocess.run(status_command, capture_output=True, text=True)
+
+                if local_changes.stdout:
+                    logger.warning("There are local changes in the repository. Please commit or stash them before checking out.")
+                    return {"return": 1, "error": f"Local changes detected in the already existing repository: {repo_path}"}
+                else:
+                    logger.info("No local changes detected. Fetching latest changes...")
+                    subprocess.run(['git', '-C', repo_path, 'fetch'], check=True)
             
             # Checkout to a specific branch or commit if --checkout is provided
             if checkout:
@@ -1363,12 +1368,27 @@ class RepoAction(Action):
         repo_path = os.path.join(self.repos_path, repo_folder_name)
 
         if os.path.exists(repo_path):
-            shutil.rmtree(repo_path)
-            logger.info(f"Repo {run_args['repo']} residing in path {repo_path} has been successfully removed")
-            logger.info("Checking whether the repo was registered in repos.json")
+            # Check for local changes
+            status_command = ['git', '-C', repo_path, 'status', '--porcelain']
+            local_changes = subprocess.run(status_command, capture_output=True, text=True)
+
+            if local_changes.stdout:
+                logger.warning("Local changes detected in repository. Changes are listed below:")
+                print(local_changes.stdout)
+                confirm_remove = True if(input("Continue to remove repo?").lower()) in ["yes", "y"] else False
+            else:
+                logger.info("No local changes detected. Removing repo...")
+                confirm_remove = True
+            if confirm_remove:
+                shutil.rmtree(repo_path)
+                logger.info(f"Repo {run_args['repo']} residing in path {repo_path} has been successfully removed")
+                logger.info("Checking whether the repo was registered in repos.json")
+                self.unregister_repo(repo_path)
+            else:
+                logger.info("rm repo ooperation cancelled by user!")
         else:
             logger.warning(f"Repo {run_args['repo']} was not found in the repo folder. repos.json will be checked for any corrupted entry. If any, that will be removed.")
-        self.unregister_repo(repo_path)
+            self.unregister_repo(repo_path)
 
         return {"return": 0}
         
@@ -1389,7 +1409,7 @@ class ScriptAction(Action):
         return res
 
     find = search
-
+        
     def rm(self, i):
         if not i.get('target_name'):
             i['target_name'] = "script"
@@ -1515,7 +1535,21 @@ Main Script Meta:""")
 
 
     def list(self, args):
-        logger.info("Listing all scripts.")
+        self.action_type = "script"
+        run_args = {"fetch_all": True}  # to fetch the details of all the scripts present in repos registered  in mlc
+        
+        res = self.search(run_args)
+        if res['return'] > 0:
+            return res
+        
+        logger.info(f"Listing all the scripts and their paths present in repos which are registered in MLC")
+        print("......................................................")
+        for item in res['list']:
+            print(f"alias: {item.meta['alias'] if item.meta.get('alias') else 'None'}")
+            print(f"Location: {item.path}")
+            print("......................................................")
+
+        return {"return": 0}
 
 
 class ScriptExecutionError(Exception):
@@ -1579,7 +1613,20 @@ Cache Meta:""")
         return {'return': 0}
 
     def list(self, args):
-        logger.info("Listing all caches.")
+        self.action_type = "cache"
+        run_args = {"fetch_all": True}  # to fetch the details of all the caches generated
+        
+        res = self.search(run_args)
+        if res['return'] > 0:
+            return res
+        
+        logger.info(f"Listing all the caches and their paths")
+        print("......................................................")
+        for item in res['list']:
+            print(f"tags: {item.meta['tags'] if item.meta.get('tags') else 'None'}")
+            print(f"Location: {item.path}")
+            print("......................................................")
+
         return {'return': 0}
 
 class ExperimentAction(Action):
@@ -1646,15 +1693,15 @@ actions = {
     }
 
 # Factory to get the appropriate action class
-def get_action(target):
+def get_action(target, parent):
     action_class = actions.get(target, None)
-    return action_class() if action_class else None
+    return action_class(parent) if action_class else None
 
 
 def access(i):
     action = i['action']
     target = i.get('target', i.get('automation'))
-    action_class = get_action(target)
+    action_class = get_action(target, default_parent)
     r = action_class.access(i)
     return r
 
@@ -1745,7 +1792,7 @@ def main():
             run_args['dest'] = args.extra[0]
 
     # Get the action handler for other commands
-    action = get_action(args.target)
+    action = get_action(args.target, default_parent)
     # Dynamically call the method (e.g., run, list, show)
     if action and hasattr(action, args.command):
         method = getattr(action, args.command)
