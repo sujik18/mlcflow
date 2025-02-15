@@ -97,11 +97,9 @@ class Action:
         return {'return': 0}
 
     def find_target_folder(self, target):
-        # Traverse through each folder in REPOS to find the first 'target' folder inside an 'automation' folder
-        if not os.path.exists(self.repos_path):
-            os.makedirs(self.repos_path, exist_ok=True)
-        for repo_dir in os.listdir(self.repos_path):
-            repo_path = os.path.join(self.repos_path, repo_dir)
+        # Traverse through each repo to find the first 'target' folder inside an 'automation' folder
+        for repo in self.repos:
+            repo_path = repo.path
             if os.path.isdir(repo_path):
                 automation_folder = os.path.join(repo_path, 'automation')
                 
