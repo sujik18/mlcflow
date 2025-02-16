@@ -28,7 +28,7 @@ jobs:
 
       - name: Add Upstream Remote
         run: |
-          git remote add upstream https://github.com/mlcommons/mlperf-automations.git
+          git remote add upstream https://github.com/mlcommons/mlcflow.git
           git fetch upstream
       - name: Reset Branch to Upstream
         run: |
