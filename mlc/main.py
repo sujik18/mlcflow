@@ -60,6 +60,7 @@ class Automation:
         return {'return': 0, 'list': result}
         #indices
 
+
 def mlcr():
     first_arg_value = "run"
     second_arg_value = "script"
