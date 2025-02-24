@@ -48,7 +48,7 @@ class Action:
         action_target_split = action_target.split(",")
         action_target = action_target_split[0]
 
-        action = get_action(action_target, self)
+        action = get_action(action_target, self.parent if self.parent else self)
 
         if action and hasattr(action, action_name):
             # Find the method and call it with the options
@@ -106,13 +106,9 @@ class Action:
             if not os.path.exists(repo_path):
                 logger.warning(f"""Warning: {repo_path} not found. Considering it as a corrupt entry and deleting automatically...""")
                 logger.warning(f"Deleting the {meta_yaml_path} entry from repos.json")
-                res = self.access(
-                    {
-                        "automation": "repo",
-                        "action": "rm",
-                        "repo": f"{os.path.basename(repo_path)}"    
-                    }
-                )
+                from .repo_action import rm_repo
+                res = rm_repo(repo_path, os.path.join(self.repos_path, 'repos.json'), True)
+
                 if res["return"] > 0:
                     return res
                 continue
