@@ -6,7 +6,7 @@ import inspect
 
 from . import utils
 
-from .action import Action, logger, default_parent
+from .action import Action, default_parent
 from .repo_action import RepoAction
 from .script_action import ScriptAction
 from .cache_action import CacheAction
@@ -15,7 +15,7 @@ from .experiment_action import ExperimentAction
 
 from .item import Item
 from .action_factory import get_action
-from .logger import logger
+from .logger import logger, logging
 
 
 class Automation:
@@ -167,8 +167,28 @@ def main():
     
     # Parse arguments
     args = parser.parse_args()
-            
+
     #logger.info(f"Args = {args}")
+
+    # set log level for MLCFlow if -v/--verbose or -s/--silent is specified
+    log_flag_aliases = {
+        '-v': '--verbose',
+        '-s': '--silent'
+        }
+    
+    log_levels = {
+        '--verbose': logging.DEBUG,
+        '--silent': logging.WARNING
+        }
+
+    # Modify args.extra in place
+    args.extra[:] = [log_flag_aliases.get(arg, arg) for arg in args.extra]
+
+    # Set log level based on the first matching flag
+    for flag, level in log_levels.items():
+        if flag in args.extra:
+            logger.setLevel(level)
+            args.extra.remove(flag)
 
     res = utils.convert_args_to_dictionary(args.extra)
     if res['return'] > 0:
@@ -215,7 +235,7 @@ def main():
         if help_text != "":
             print(help_text)
         sys.exit(0)
-
+    
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
         
