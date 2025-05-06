@@ -425,6 +425,23 @@ def convert_args_to_dictionary(inp):
 
     return {'return': 0, 'args_dict': args_dict}
 
+def is_uid(name):
+        """
+        Checks if the given name is a 16-digit hexadecimal UID.
+
+        Args:
+            name (str): The string to check.
+
+        Returns:
+            bool: True if the name is a 16-digit hexadecimal UID, False otherwise.
+        """
+        # Define a regex pattern for a 16-digit hexadecimal UID
+        hex_uid_pattern = r"^[0-9a-fA-F]{16}$"
+
+        # Check if the name matches the pattern
+        return bool(re.fullmatch(hex_uid_pattern, name))
+
+
 def is_valid_url(url):
     pattern = re.compile(
         r"^(https?|ftp)://"  # Protocol (http, https, ftp)
@@ -611,6 +628,25 @@ def get_new_uid():
         return {"return": 0, "uid": new_uid}
     except Exception as e:
         return {"return": 1, "error": f"Failed to generate UID: {str(e)}"}
+    
+def modify_git_url(get_type, url, params={}):
+    """
+    Modify the GitHub url to support cloning of repo with either ssh or pat
+
+    Returns:
+        dict: A dictionary containing:
+            - return (int): 0 if successful, >0 if there was an error.
+            - url (str): Modified git url.
+    """
+    from giturlparse import parse
+    p = parse(url)
+    if get_type == "ssh":
+        return {"return": 0, "url": p.url2ssh }
+    elif get_type == "pat":
+        token = params['token']
+        return {"return": 0, "url":"https://git:" + token + "@" + p.host + "/" + p.owner + "/" + p.repo }
+    else:
+        return {"return": 1, "error": f"Unsupported type: {get_type}"}
 
 def convert_tags_to_list(tags_string):
     """

@@ -121,6 +121,7 @@ jobs:
     - name: Test 7 - run script - Output being used for testing mlc cache
       run: |
         mlc run script --tags=get,imagenet-aux --quiet
+        mlc run script bb2c6dd8c8c64217 --quiet
         mlc run script --tags=get,imagenet-aux,_from.dropbox --quiet
 
     - name: Test 8 - find cache - More than one cache present
@@ -141,6 +142,7 @@ jobs:
     - name: Test 11 - cp script - Copy mlc script 
       run: |
         mlc cp script detect-os my-os-detect
+        mlc cp script detect-os/ my-os-detect-1
 
     - name: Test 12 - add repo - Add a new MLC repo 
       run: |
@@ -193,6 +195,11 @@ jobs:
     - name: Test 20 - list cache
       run: |
         mlc list cache
+    
+    - name: Test 21 - Test mlc pull repo to checkout based on particular release tag
+      run: |
+        mlc rm repo mlcommons@mlperf-automations -f
+        mlc pull repo mlcommons@mlperf-automations --tag=mlperf-automations-v1.0.0
 
   test_mlc_access_core_actions:
 
@@ -236,7 +243,81 @@ jobs:
       run: |
         mlc pull repo mlcommons@mlperf-automations --checkout=dev
 
+    - name: Test for rm cache - invalid cache entry tags(test succeeds if command fails)
+      run: |
+        ! mlc rm cache --tags=sample,invalid,tags
+
+    - name: Test for rm cache when the cache folder is empty(only for mlc rm cache without specifying particular script)
+      run: |
+        mlc rm cache -f
+        mlc rm cache -f
+
     - name: Run tests from test-mlc-access.py
       run: |
         cd .github/scripts && python -c "import test_mlc_access as test; test.run_tests()"
 
+  test_mlc_help:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.8"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        exclude:
+          - os: windows-latest
+          - os: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Configure git longpaths (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        git config --system core.longpaths true
+
+    - name: Install mlcflow from the pull request's source repository and branch
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --ignore-installed --verbose pip setuptools
+        python -m pip install .
+    - name: MLC intro
+      run: |
+        mlc help
+    - name: MLC scripts - full
+      run: |
+        mlc help script
+    - name: MLC scripts - individual actions
+      run: |
+        mlc help add script
+        mlc help docker script
+        mlc help find script
+        mlc help search script
+        mlc help list script
+        mlc help rm script
+        mlc help run script
+        mlc help show script
+        mlc help test script
+    - name: MLC repos - full
+      run: |
+        mlc help repo
+    - name: MLC repos - individual actions
+      run: |
+        mlc help add repo
+        mlc help find repo
+        mlc help pull repo
+        mlc help list repo
+        mlc help rm repo
+    - name: MLC cache - full
+      run: |
+        mlc help cache
+    - name: MLC cache - individual actions
+      run: |
+        mlc help find cache
+        mlc help list cache
+        mlc help rm cache
+        mlc help search cache
+        mlc help show cache
