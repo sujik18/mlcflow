@@ -13,6 +13,7 @@ from . import utils
 from .index import Index
 from .repo import Repo
 from .item import Item
+from .error_codes import WarningCode
 
 # Base class for actions
 class Action:
@@ -113,9 +114,9 @@ class Action:
                     return res
                 continue
 
+            repo_path = repo_path.strip()  # Remove any extra whitespace or newlines
             if is_curdir_inside_path(repo_path):
                 self.current_repo_path = repo_path
-            repo_path = repo_path.strip()  # Remove any extra whitespace or newlines
 
            # Skip empty lines
             if not repo_path:
@@ -260,8 +261,13 @@ class Action:
         
         target_name = i.get('target_name', self.action_type)
         target_path = os.path.join(repo_path, target_name)
-        if target_name == "cache":
-            folder_name = f"""{i["script_alias"]}_{item_name or item_id[:8]}""" if i.get("script_alias") else item_name or item_id
+        if target_name in ["cache", "experiment"]:
+            extra_tags_suffix=i.get('extra_tags', '').replace(",", "-")[:15]
+            if extra_tags_suffix != '':
+                suffix = f"_{extra_tags_suffix}"
+            else:
+                suffix = ''
+            folder_name = f"""{i["script_alias"]}{suffix}_{item_name or item_id[:8]}""" if i.get("script_alias") else item_name or item_id
         else:
             folder_name = item_name or item_id
 
@@ -340,9 +346,10 @@ class Action:
             # Do not error out if fetch_all is used
             if inp.get("fetch_all", False) == True:
                 logger.warning(f"{target_name} is empty! nothing to be cleared!")
-                return {"return": 0}
+                return {"return": 0, "warnings": [{"code": WarningCode.EMPTY_TARGET.code, "description": f"{target_name} is empty! nothing to be cleared!"}]}
             else:
-                return {'return': 16, 'error': f'No {target_name} found for {inp}'}
+                logger.warning(f"No {target_name} found for {inp}")
+                return {'return': 0, "warnings": [{"code": WarningCode.EMPTY_TARGET.code, "description": f"No {target_name} found for {inp}"}]}
         elif len(res['list']) > 1:
             logger.info(f"More than 1 {target_name} found for {inp}:")
             if not i.get('all'):
@@ -405,7 +412,7 @@ class Action:
 
         if save_result["return"] > 0:
             return save_result
-    
+   
         self.index.add(item_meta, target_name, item_path, repo)
         return {'return': 0}
 
@@ -422,7 +429,7 @@ class Action:
             dict: Return code and message.
         """
         # Step 1: Search for items based on input tags
-        target_name = i.get('target_name',"cache")
+        target_name = i.get('target_name', i.get('target', "cache"))
         i['target_name'] = target_name
         ii = i.copy()
 
@@ -551,16 +558,16 @@ class Action:
         target_split = target_item.split(":")
 
         if len(target_split) > 1:
-            target_repo = target_split[0].strip()
-            if target_repo == ".":
+            target_repo_name = target_split[0].strip()
+            if target_repo_name == ".":
                 if not self.current_repo_path:
                     return {'return': 1, 'error': f"""Current directory is not inside a registered MLC repo and so using ".:" is not valid"""}
-                target_repo = self.current_repo_path
+                target_repo_name = os.path.basename(self.current_repo_path)
             else:
-                if not any(os.path.basename(repodata.path) == target_repo for repodata in self.repos):
+                if not any(os.path.basename(repodata.path) == target_repo_name for repodata in self.repos):
                     return {'return': 1, 'error': f"""The target repo {target_repo} is not registered in MLC. Either register in MLC by cloning from Git through command `mlc pull repo` or create repo using `mlc add repo` command and try to rerun the command again"""}
-            target_repo_path = os.path.join(self.repos_path, target_repo)
-            target_repo = Repo(target_repo_path)
+            target_repo_path = os.path.join(self.repos_path, target_repo_name)
+            target_repo = next((k for k in self.repos if os.path.basename(k.path) == target_repo_name), None)
             target_item_name = target_split[1].strip()
         else:
             target_repo = result.repo
@@ -710,7 +717,7 @@ class Action:
                 if target == "script":
                     non_variation_tags = [t for t in tags_split if not t.startswith("_")]
                     tags_to_match = non_variation_tags
-                elif target =="cache":
+                elif target in ["cache", "experiment"]:
                     tags_to_match = tags_split
                 else:
                     return {'return': 1, 'error': f"""Target {target} not handled in mlc yet"""}

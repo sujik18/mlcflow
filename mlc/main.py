@@ -97,6 +97,10 @@ def process_console_output(res, target, action, run_args):
         else:
             for item in res['list']:
                 logger.info(f"""Item path: {item.path}""")
+    if "warnings" in res:
+        logger.warning(f"{len(res['warnings'])} warning(s) found during the execution of the mlc command.")
+        for warning in res["warnings"]:
+            logger.warning(f"Warning code: {warning['code']}, Discription: {warning['description']}")
 
 if default_parent is None:
     default_parent = Action()
