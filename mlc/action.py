@@ -707,7 +707,7 @@ class Action:
                     for res in target_index:
                         if os.path.basename(res["path"]) == folder_name:
                             it = Item(res['path'], res['repo'])
-                            #result.append(it)
+                            result.append(it)
             else:
                 tags = i.get("tags")
                 if tags:
