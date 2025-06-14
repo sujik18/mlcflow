@@ -713,7 +713,7 @@ class Action:
                 if tags:
                     tags_split = tags.split(",")
                 else:
-                    return {"return":1, "error": f"Tags are not specifeid for completing the specific action"}
+                    return {"return":1, "error": f"Tags are not specified for completing the requested action"}
                 if target == "script":
                     non_variation_tags = [t for t in tags_split if not t.startswith("_")]
                     tags_to_match = non_variation_tags
