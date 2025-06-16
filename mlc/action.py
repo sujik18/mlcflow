@@ -23,7 +23,6 @@ class Action:
     logger = None
     local_repo = None
     current_repo_path = None
-    #mlc = None
     repos = [] #list of Repo objects
 
     # Main access function to simulate a Python interface for CLI
@@ -167,7 +166,7 @@ class Action:
     
 
     def __init__(self):        
-        setup_logging(log_path=os.getcwd(),log_file='mlc-log.txt')
+        setup_logging(log_path=os.getcwd(), log_file='.mlc-log.txt')
         self.logger = logger
 
         temp_repo = os.environ.get('MLC_REPOS','').strip()
