@@ -53,7 +53,6 @@ class ScriptAction(Action):
         if not i.get('target_name'):
             i['target_name'] = "script"
         res = self.parent.search(i)
-        #print(res)
         return res
 
     find = search
@@ -235,6 +234,8 @@ Main Script Meta:""")
                 result = automation_instance.test(run_args)  # Pass args to the run method
             elif function_name == "experiment":
                 result = automation_instance.experiment(run_args)  # Pass args to the experiment method
+            elif function_name == "doc":
+                result = automation_instance.doc(run_args)  # Pass args to the doc method
             else:
                 return {'return': 1, 'error': f'Function {function_name} is not supported'}
             
