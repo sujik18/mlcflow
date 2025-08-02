@@ -98,6 +98,7 @@ class ScriptAction(Action):
       Main Script Meta:
         uid: 863735b7db8c44fc
         alias: detect-os
+        description: Detects the operating system and platform information
         tags: ['detect-os', 'detect', 'os', 'info']
         new_env_keys: ['MLC_HOST_OS_*', '+MLC_HOST_OS_*', 'MLC_HOST_PLATFORM_*', 'MLC_HOST_PYTHON_*', 'MLC_HOST_SYSTEM_NAME', 
                        'MLC_RUN_STATE_DOCKER', '+PATH']
@@ -107,6 +108,7 @@ class ScriptAction(Action):
 
     Note:
     - The `find` action is a subset of `show`, retrieving only the path of the searched script in MLC repositories.
+    - The `describe` action is a subset of `show`, retrieving only the description of the searched script.
 
         """
         self.action_type = "script"
@@ -114,7 +116,7 @@ class ScriptAction(Action):
         if res['return'] > 0:
             return res
         logger.info(f"Showing script with tags: {run_args.get('tags')}")
-        script_meta_keys_to_show = ["uid", "alias", "tags", "new_env_keys", "new_state_keys", "cache"]
+        script_meta_keys_to_show = ["uid", "alias", "description", "tags", "new_env_keys", "new_state_keys", "cache"]
         for item in res['list']:
             print(f"""Location: {item.path}:
 Main Script Meta:""")
@@ -127,6 +129,42 @@ Main Script Meta:""")
             print("......................................................")
             print(f"""For full script meta, see meta file at {os.path.join(item.path, "meta.yaml")}""")
             print("")
+            
+        return {'return': 0}
+
+    def describe(self, run_args):
+        """
+    ####################################################################################################################
+    Target: Script
+    Action: Describe
+    ####################################################################################################################
+
+    The `describe` action retrieves the description of the searched script in MLC repositories.
+
+    Example Command:
+
+    mlc describe script --tags=detect,os
+
+    Example Output:
+          
+      arjun@intel-spr-i9:~$ mlc describe script --tags=detect,os
+      [2025-02-14 02:56:16,604 main.py:1404 INFO] - Describing script with tags: detect,os
+      detect-os: Detects the operating system and platform information
+
+    Note:
+    - The `describe` action is a subset of `show`, retrieving only the description of the searched script.
+    - If no description is available in the script metadata, "No description available" will be displayed.
+
+        """
+        self.action_type = "script"
+        res = self.search(run_args)
+        if res['return'] > 0:
+            return res
+        logger.info(f"Describing script with tags: {run_args.get('tags')}")
+        for item in res['list']:
+            alias = item.meta.get('alias', 'Unknown')
+            description = item.meta.get('description', 'No description available')
+            print(f"{alias}: {description}")
             
         return {'return': 0}
 

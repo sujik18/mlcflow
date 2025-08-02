@@ -53,6 +53,17 @@ Retrieves the path and metadata of scripts in MLC repositories.
 mlc show script --tags=detect,os
 ```
 
+---
+
+## **Describe**  
+
+Retrieves only the description of scripts in MLC repositories.  
+
+**Example Command:**  
+```bash
+mlc describe script --tags=detect,os
+```
+
 <details>
   <summary><strong>Example Output</strong> 📌</summary>
 
