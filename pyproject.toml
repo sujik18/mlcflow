@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mlcflow"
-version = "1.0.13"
+version = "1.0.20"
+
+
 
 description = "An automation interface for ML applications"
 authors = [

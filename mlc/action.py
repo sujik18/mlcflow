@@ -23,7 +23,6 @@ class Action:
     logger = None
     local_repo = None
     current_repo_path = None
-    #mlc = None
     repos = [] #list of Repo objects
 
     # Main access function to simulate a Python interface for CLI
@@ -167,7 +166,7 @@ class Action:
     
 
     def __init__(self):        
-        setup_logging(log_path=os.getcwd(),log_file='mlc-log.txt')
+        setup_logging(log_path=os.getcwd(), log_file='.mlc-log.txt')
         self.logger = logger
 
         temp_repo = os.environ.get('MLC_REPOS','').strip()
@@ -654,6 +653,7 @@ class Action:
         uid = i.get("uid")
         alias = i.get("alias")
         item_repo = i.get('item_repo')
+        exact_tags_match = i.get('exact_tags_match', False)
         fetch_all = True if i.get('fetch_all') else False
 
         # For targets like cache, sometimes user would need to clear the entire cache folder present in the system
@@ -707,13 +707,13 @@ class Action:
                     for res in target_index:
                         if os.path.basename(res["path"]) == folder_name:
                             it = Item(res['path'], res['repo'])
-                            #result.append(it)
+                            result.append(it)
             else:
                 tags = i.get("tags")
                 if tags:
                     tags_split = tags.split(",")
                 else:
-                    return {"return":1, "error": f"Tags are not specifeid for completing the specific action"}
+                    return {"return":1, "error": f"Tags are not specified for completing the requested action"}
                 if target == "script":
                     non_variation_tags = [t for t in tags_split if not t.startswith("_")]
                     tags_to_match = non_variation_tags
@@ -726,7 +726,7 @@ class Action:
                 p_tags = list(set(tags_to_match) - set(n_tags_))
                 for res in target_index:
                     c_tags = res["tags"]
-                    if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)):
+                    if (exact_tags_match and set(p_tags) == set(c_tags)) or (not exact_tags_match and set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags))):
                         it = Item(res['path'], res['repo'])
                         result.append(it)
         return {'return': 0, 'list': result}
