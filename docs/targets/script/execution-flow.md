@@ -36,14 +36,14 @@ When we run an MLC script we can also pass inputs to it and any input added in `
 We can use `skip_if_env` dictionary inside any `deps`, `prehook_deps`, `posthook_deps` or `post_deps` to make its execution conditional
 
 ### Versions
-We can specify any specific version of a script using `version`. `version_max` and `version_min` are also possible options. 
+We can specify any specific version of a script using `version`. `version_max`, `version_min` and `version_max_usable` are also possible options. 
 
-* When `version_min` is given, any version above this if present in the cache or detected in the system can be chosen. If nothing is detected `default_version` if present and if above `version_min` will be used for installation. Otherwise `version_min` will be used as `version`.
+* When `version_min` is given, any version above this if present in the cache or detected in the system can be chosen. If nothing is detected `default_version` if present and if above `version_min` will be used for installation. Otherwise `version_max_usable` if present or else `version_min` will be used as `version`.
 
 * When `version_max` is given, any version below this if present in the cache or detected in the system can be chosen. If nothing is detected `default_version` if present and if below `version_max` will be used for installation. Otherwise `version_max_usable` (additional needed input for `version_max`) will be used as `version`.
-
+  
 ### Variations
-* Variations are used to customize MLC script and each unique combination of variations uses a unique cache entry. Each variation can turn on `env` keys also any other meta including dependencies specific to it. Variations are turned on like tags but with a `_` prefix. For example, if a script is having tags `"get,myscript"`, to call the variation `"test"` inside it, we have to use tags `"get,myscript,_test"`. 
+* Variations are used to customize MLC script and each set of variations uses a unique cache entry. A variation can turn on `env` keys and any other meta including dependencies specific to it. Variations are turned on like tags but with a `_` prefix. For example, if a script is having tags `"get,myscript"`, to call the variation `"test"` inside it, we can use tags `"get,myscript,_test"`. 
  
 #### Variation groups
 `group` is a key to map variations into a group and at any time only one variation from a group can be used in the variation tags. For example, both `cpu` and `cuda` can be two variations under the `device` group, but user can at any time use either `cpu` or `cuda` as variation tags but not both.
@@ -63,6 +63,7 @@ Sometimes it is difficult to add all variations needed for a script like say `ba
 * Similarly we can avoid any env key from being passed to a given dependency by adding the prefix of the key in the `clean_env_keys` list of the concerned dependency.
 * `--input` is automatically converted to `MLC_INPUT` env key
 * `version` is converted to `MLC_VERSION`, ``version_min` to `MLC_VERSION_MIN` and `version_max` to `MLC_VERSION_MAX`
+* `mlc 
 * If `env['MLC_GH_TOKEN']=TOKEN_VALUE` is set then git URLs (specified by `MLC_GIT_URL`) are changed to add this token.
 * If `env['MLC_GIT_SSH']=yes`, then git URLs are changed to SSH from HTTPS.
 
