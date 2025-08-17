@@ -234,6 +234,8 @@ Main Script Meta:""")
                 result = automation_instance.test(run_args)  # Pass args to the run method
             elif function_name == "experiment":
                 result = automation_instance.experiment(run_args)  # Pass args to the experiment method
+            elif function_name == "help":
+                result = automation_instance.help(run_args)  # Pass args to the help method
             elif function_name == "doc":
                 result = automation_instance.doc(run_args)  # Pass args to the doc method
             elif function_name == "lint":
@@ -300,6 +302,7 @@ Main Script Meta:""")
     Example Command:
 
     mlc run script --tags=detect,os -j
+    mlcr detect,os -j
 
     Options:
 
@@ -308,6 +311,8 @@ Main Script Meta:""")
     3. *<Individual script inputs>: The `mlcr` command can accept additional inputs defined in the script's `input_mappings` metadata.  
 
         """
+        if not run_args.get('tags') and not run_args.get('details'):
+            return self.call_script_module_function("help", run_args)
         return self.call_script_module_function("run", run_args)
 
 
