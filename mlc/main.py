@@ -120,11 +120,11 @@ def main():
 
     Each target has a specific set of actions to tailor automation workflows, as shown below:
     
-    | Target  | Actions                                                       |
-    |---------|---------------------------------------------------------------|
-    | script  | run, find/search, rm, mv, cp, add, test, docker, show, describe |
-    | cache   | find/search, rm, show                                         |
-    | repo    | pull, search, rm, list, find/search                           |
+    | Target  | Actions                                               |
+    |---------|-------------------------------------------------------|
+    | script  | run, find/search, rm, mv, cp, add, test, docker, show |
+    | cache   | find/search, rm, show                                 |
+    | repo    | pull, search, rm, list, find/search                   |
     
     Example:
       mlc run script detect-os
@@ -144,7 +144,7 @@ def main():
     subparsers = parser.add_subparsers(dest='command', required=True)
 
     # Script and Cache-specific subcommands
-    for action in ['run', 'pull', 'test', 'add', 'show', 'describe', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
+    for action in ['run', 'pull', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
         action_parser = subparsers.add_parser(action, help=f'{action} a target.')
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"

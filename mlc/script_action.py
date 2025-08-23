@@ -107,7 +107,6 @@ class ScriptAction(Action):
 
     Note:
     - The `find` action is a subset of `show`, retrieving only the path of the searched script in MLC repositories.
-    - The `describe` action is a subset of `show`, retrieving only the description of the searched script.
 
         """
         self.action_type = "script"
@@ -128,42 +127,6 @@ Main Script Meta:""")
             print("......................................................")
             print(f"""For full script meta, see meta file at {os.path.join(item.path, "meta.yaml")}""")
             print("")
-            
-        return {'return': 0}
-
-    def describe(self, run_args):
-        """
-    ####################################################################################################################
-    Target: Script
-    Action: Describe
-    ####################################################################################################################
-
-    The `describe` action retrieves the description of the searched script in MLC repositories.
-
-    Example Command:
-
-    mlc describe script --tags=detect,os
-
-    Example Output:
-          
-      arjun@intel-spr-i9:~$ mlc describe script --tags=detect,os
-      [2025-02-14 02:56:16,604 main.py:1404 INFO] - Describing script with tags: detect,os
-      detect-os: Detects the operating system and platform information
-
-    Note:
-    - The `describe` action is a subset of `show`, retrieving only the description of the searched script.
-    - If no description is available in the script metadata, "No description available" will be displayed.
-
-        """
-        self.action_type = "script"
-        res = self.search(run_args)
-        if res['return'] > 0:
-            return res
-        logger.info(f"Describing script with tags: {run_args.get('tags')}")
-        for item in res['list']:
-            alias = item.meta.get('alias', 'Unknown')
-            description = item.meta.get('description', 'No description available')
-            print(f"{alias}: {description}")
             
         return {'return': 0}
 

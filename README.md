@@ -57,7 +57,7 @@ Each target has its own set of specific actions to tailor automation workflows a
 
 | Target | Action          |
 |--------|-----------------|
-| script    | run, find/search, rm, mv, cp, add, test, docker, show, describe       |
+| script    | run, find/search, rm, mv, cp, add, test, docker, show       |
 | cache    | find/search, rm, show  |
 | repo    | pull, search, rm, list, find/search , add        |
 
