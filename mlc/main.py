@@ -64,11 +64,12 @@ class Automation:
                         uid = item_split[1]
                     else:
                         uid = item_split[0]
-            for res in target_index:
-                c_tags = res["tags"]
-                if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)) and (not uid or uid == res['uid']) and (not alias or alias == res['alias']):
-                    it = Item(res['path'], res['repo'])
-                    result.append(it)
+            if tags or uid or i.get('all'):
+                for res in target_index:
+                    c_tags = res["tags"]
+                    if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)) and (not uid or uid == res['uid']) and (not alias or alias == res['alias']):
+                        it = Item(res['path'], res['repo'])
+                        result.append(it)
         #logger.info(result)
         return {'return': 0, 'list': result}
         #indices
