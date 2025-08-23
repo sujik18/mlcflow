@@ -97,6 +97,7 @@ class ScriptAction(Action):
       Main Script Meta:
         uid: 863735b7db8c44fc
         alias: detect-os
+        description: Detects the operating system and platform information
         tags: ['detect-os', 'detect', 'os', 'info']
         new_env_keys: ['MLC_HOST_OS_*', '+MLC_HOST_OS_*', 'MLC_HOST_PLATFORM_*', 'MLC_HOST_PYTHON_*', 'MLC_HOST_SYSTEM_NAME', 
                        'MLC_RUN_STATE_DOCKER', '+PATH']
@@ -113,7 +114,7 @@ class ScriptAction(Action):
         if res['return'] > 0:
             return res
         logger.info(f"Showing script with tags: {run_args.get('tags')}")
-        script_meta_keys_to_show = ["uid", "alias", "tags", "new_env_keys", "new_state_keys", "cache"]
+        script_meta_keys_to_show = ["uid", "alias", "description", "tags", "new_env_keys", "new_state_keys", "cache"]
         for item in res['list']:
             print(f"""Location: {item.path}:
 Main Script Meta:""")
