@@ -64,11 +64,12 @@ class Automation:
                         uid = item_split[1]
                     else:
                         uid = item_split[0]
-            for res in target_index:
-                c_tags = res["tags"]
-                if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)) and (not uid or uid == res['uid']) and (not alias or alias == res['alias']):
-                    it = Item(res['path'], res['repo'])
-                    result.append(it)
+            if tags or uid or i.get('all'):
+                for res in target_index:
+                    c_tags = res["tags"]
+                    if set(p_tags).issubset(set(c_tags)) and set(n_tags).isdisjoint(set(c_tags)) and (not uid or uid == res['uid']) and (not alias or alias == res['alias']):
+                        it = Item(res['path'], res['repo'])
+                        result.append(it)
         #logger.info(result)
         return {'return': 0, 'list': result}
         #indices
@@ -152,7 +153,7 @@ def main():
         action_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     # Script specific subcommands
-    for action in ['docker', 'experiment']:
+    for action in ['docker', 'experiment', 'doc', 'lint']:
         action_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
         action_parser.add_argument('target', choices=['script', 'run'], help='Target type (script).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
@@ -247,7 +248,7 @@ def main():
         if args.target == "repo":
             run_args['repo'] = args.details
   
-    if args.command in ['docker', 'experiment']:
+    if args.command in ['docker', 'experiment', 'doc', 'lint']:
         if args.target == "run":
             run_args['target'] = 'script' #allowing run to be used for docker run instead of docker script
             args.target = "script"

@@ -53,7 +53,6 @@ class ScriptAction(Action):
         if not i.get('target_name'):
             i['target_name'] = "script"
         res = self.parent.search(i)
-        #print(res)
         return res
 
     find = search
@@ -98,6 +97,7 @@ class ScriptAction(Action):
       Main Script Meta:
         uid: 863735b7db8c44fc
         alias: detect-os
+        description: Detects the operating system and platform information
         tags: ['detect-os', 'detect', 'os', 'info']
         new_env_keys: ['MLC_HOST_OS_*', '+MLC_HOST_OS_*', 'MLC_HOST_PLATFORM_*', 'MLC_HOST_PYTHON_*', 'MLC_HOST_SYSTEM_NAME', 
                        'MLC_RUN_STATE_DOCKER', '+PATH']
@@ -114,7 +114,7 @@ class ScriptAction(Action):
         if res['return'] > 0:
             return res
         logger.info(f"Showing script with tags: {run_args.get('tags')}")
-        script_meta_keys_to_show = ["uid", "alias", "tags", "new_env_keys", "new_state_keys", "cache"]
+        script_meta_keys_to_show = ["uid", "alias", "description", "tags", "new_env_keys", "new_state_keys", "cache"]
         for item in res['list']:
             print(f"""Location: {item.path}:
 Main Script Meta:""")
@@ -235,6 +235,12 @@ Main Script Meta:""")
                 result = automation_instance.test(run_args)  # Pass args to the run method
             elif function_name == "experiment":
                 result = automation_instance.experiment(run_args)  # Pass args to the experiment method
+            elif function_name == "help":
+                result = automation_instance.help(run_args)  # Pass args to the help method
+            elif function_name == "doc":
+                result = automation_instance.doc(run_args)  # Pass args to the doc method
+            elif function_name == "lint":
+                result = automation_instance.lint(run_args)  # Pass args to the lint method
             else:
                 return {'return': 1, 'error': f'Function {function_name} is not supported'}
             
@@ -284,6 +290,7 @@ Main Script Meta:""")
         """
         return self.call_script_module_function("docker", run_args)
 
+
     def run(self, run_args):
         """
     ####################################################################################################################
@@ -296,6 +303,7 @@ Main Script Meta:""")
     Example Command:
 
     mlc run script --tags=detect,os -j
+    mlcr detect,os -j
 
     Options:
 
@@ -304,13 +312,16 @@ Main Script Meta:""")
     3. *<Individual script inputs>: The `mlcr` command can accept additional inputs defined in the script's `input_mappings` metadata.  
 
         """
+        if not run_args.get('tags') and not run_args.get('details'):
+            return self.call_script_module_function("help", run_args)
         return self.call_script_module_function("run", run_args)
+
 
     def test(self, run_args):
         """
     ####################################################################################################################
     Target: Script
-    Action: Run
+    Action: test
     ####################################################################################################################
 
     The `test` action validates scripts that are configured with a `tests` section in `meta.yaml`.  
@@ -322,9 +333,44 @@ Main Script Meta:""")
         """
         return self.call_script_module_function("test", run_args)
 
+
+    def doc(self, run_args):
+        """
+    ####################################################################################################################
+    Target: Script
+    Action: doc
+    ####################################################################################################################
+
+    The `doc` action creates automatic README for scripts from the contents in `meta.yaml`.  
+
+    Example Command:
+
+    mlc doc script --tags=detect,os
+
+        """
+        return self.call_script_module_function("doc", run_args)
+
+    def lint(self, run_args):
+        """
+    ####################################################################################################################
+    Target: Script
+    Action: lint
+    ####################################################################################################################
+
+    The `lint` action automatically formats the contents in `meta.yaml`.  
+
+    Example Command:
+
+    mlc lint script --tags=detect,os
+
+        """
+        return self.call_script_module_function("lint", run_args)
+
+
     def help(self, run_args):
         # Internal function to call the help function in script automation module.py
         return self.call_script_module_function("help", run_args)
+
 
     def list(self, args):
         """
