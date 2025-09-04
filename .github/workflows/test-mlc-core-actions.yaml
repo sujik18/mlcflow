@@ -1,4 +1,6 @@
 name: MLC core actions test
+permissions:
+  contents: read
 
 on:
   pull_request:
