@@ -7,7 +7,8 @@ on:
       - '.github/workflows/test-mlperf-inference-bert-deepsparse-tf-onnxruntime-pytorch.yml'
       - '**'
       - '!**.md'
-
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: ${{ matrix.os }}
