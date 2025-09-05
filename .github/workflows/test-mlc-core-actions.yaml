@@ -1,4 +1,6 @@
 name: MLC core actions test
+permissions:
+  contents: read
 
 on:
   pull_request:
@@ -327,3 +329,9 @@ jobs:
         mlc help rm cache
         mlc help search cache
         mlc help show cache
+    - name: MLC doc script
+      run: |
+        mlc pull repo mlcommons@mlperf-automations
+        mlc doc script --tags=detect,cpu
+        mlc doc script --all
+       

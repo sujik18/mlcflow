@@ -7,6 +7,7 @@ import json
 import shutil
 from . import utils
 from .logger import logger
+from urllib.parse import urlparse
 
 class RepoAction(Action):
     """
@@ -85,7 +86,8 @@ class RepoAction(Action):
         if not os.path.exists(i_repo_path):
             #check if its an URL
             if utils.is_valid_url(i_repo_path):
-                if "github.com" in i_repo_path:
+                parsed = urlparse(i_repo_path)
+                if parsed.hostname == "github.com":
                     res = self.github_url_to_user_repo_format(i_repo_path)
                     if res['return'] > 0:
                         return res
@@ -197,12 +199,18 @@ class RepoAction(Action):
                 repo_uid = repo_split[1]
         elif "@" in repo:
             repo_name = repo
-        elif "github.com" in repo:
-            result = self.github_url_to_user_repo_format(repo)
-            if result["return"] == 0:
-                repo_name = result["value"]
-            else:
-                return result
+        else:
+            # Check for valid github.com URL using urlparse
+            try:
+                parsed = urlparse(repo)
+            except Exception:
+                parsed = None
+            if parsed and parsed.scheme in ("http", "https") and parsed.hostname == "github.com":
+                result = self.github_url_to_user_repo_format(repo)
+                if result["return"] == 0:
+                    repo_name = result["value"]
+                else:
+                    return result
 
         # Check if repo_name exists in repos.json
         matched_repo_path = None
