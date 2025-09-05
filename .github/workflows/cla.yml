@@ -7,6 +7,9 @@ on:
     types: [opened,closed,synchronize]
 permissions:
   contents: read
+  pull-requests: write
+  actions: read
+  statuses: write
 jobs:
   cla-check:
     runs-on: ubuntu-latest
