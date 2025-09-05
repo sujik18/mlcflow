@@ -329,3 +329,8 @@ jobs:
         mlc help rm cache
         mlc help search cache
         mlc help show cache
+    - name: MLC doc script
+      run: |
+        mlc doc script --tags=detect,cpu
+        mlc doc script --all
+       
