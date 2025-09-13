@@ -200,6 +200,7 @@ def main():
         return res
     
     run_args = res['args_dict']
+    run_args['mlc_run_cmd'] = " ".join(sys.argv)
 
     # handle help in mlcflow
     if args.command in ['help']:

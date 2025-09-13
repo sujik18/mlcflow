@@ -42,7 +42,30 @@ class CacheAction(Action):
         """
         i['target_name'] = "cache"
         #logger.debug(f"Searching for cache with input: {i}")
-        return self.parent.search(i)
+        r = self.parent.search(i)
+        if r['return'] > 0:
+            return r
+        cleaned_list = []
+
+        for item in r['list']:
+            item_meta = item.meta
+            dep = item_meta.get('dependent_cached_path')
+            if dep and not os.path.exists(dep):
+                continue  # skip item
+
+            deps = item_meta.get('dependent_cached_paths', '').split(',')
+            if any(d and not os.path.exists(d) for d in deps):
+                continue  # skip item
+
+            expiration_time = item_meta.get('expiration_time')
+            if expiration_time is not None and expiration_time < time.time():
+                continue  # skip expired item
+
+            cleaned_list.append(item)
+
+        r['list'] = cleaned_list
+
+        return r
 
     find = search
 
@@ -98,6 +121,9 @@ class CacheAction(Action):
         """
         self.action_type = "cache"
         res = self.search(run_args)
+        if res['return'] > 0:
+            return res
+
         logger.info(f"Showing cache with tags: {run_args.get('tags')}")
         cached_meta_keys_to_show = ["uid", "tags", "dependent_cached_path", "associated_script_item"]
         cached_state_keys_to_show = ["new_env", "new_state", "version"]
