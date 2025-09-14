@@ -294,38 +294,61 @@ jobs:
         python -m pip install .
     - name: MLC intro
       run: |
-        mlc help
+        mlc --help
+        mlc -h
     - name: MLC scripts - full
       run: |
-        mlc help script
+        mlc script --help
+        mlc script --h
     - name: MLC scripts - individual actions
       run: |
-        mlc help add script
-        mlc help docker script
-        mlc help find script
-        mlc help search script
-        mlc help list script
-        mlc help rm script
-        mlc help run script
-        mlc help show script
-        mlc help test script
+        mlc add script --help
+        mlc docker script --help
+        mlc find script --help
+        mlc search script --help
+        mlc list script --help
+        mlc rm script --help
+        mlc run script --help
+        mlc show script --help
+        mlc test script --help
+        mlc add script -h
+        mlc docker scrip -h
+        mlc find script -h
+        mlc search scrip -h
+        mlc list script -h
+        mlc rm script -h
+        mlc run script -h
+        mlc show script -h
+        mlc test script -h
     - name: MLC repos - full
       run: |
-        mlc help repo
+        mlc repo --help
+        mlc repo -h
     - name: MLC repos - individual actions
       run: |
-        mlc help add repo
-        mlc help find repo
-        mlc help pull repo
-        mlc help list repo
-        mlc help rm repo
+        mlc add repo --help
+        mlc find repo --help
+        mlc pull repo --help
+        mlc list repo --help
+        mlc rm repo -help
+        mlc add repo -h
+        mlc find repo -h
+        mlc pull repo -h
+        mlc list repo -h
+        mlc rm repo -h
     - name: MLC cache - full
       run: |
-        mlc help cache
+        mlc cache --help
+        mlc cache -h
     - name: MLC cache - individual actions
       run: |
-        mlc help find cache
-        mlc help list cache
-        mlc help rm cache
-        mlc help search cache
-        mlc help show cache
+        mlc find cache --help
+        mlc list cache --help
+        mlc rm cache --help
+        mlc search cache --help
+        mlc show cache --help
+        mlc find cache -h
+        mlc list cache -h
+        mlc rm cache -h
+        mlc search cache -h
+        mlc show cache -h
