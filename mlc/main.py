@@ -149,12 +149,18 @@ def main():
     # First level parser for showing help
     pre_parser = argparse.ArgumentParser(add_help=False)
     pre_parser.add_argument("action", nargs="?", help="Top-level action (run, build, help, etc.)")
-    pre_parser.add_argument("target", choices=['script', 'cache', 'repo'], nargs="?", help="Potential target (repo, script, cache, ...)")
+    pre_parser.add_argument("target", choices=['run', 'script', 'cache', 'repo'], nargs="?", help="Potential target (repo, script, cache, ...)")
     pre_parser.add_argument("-h", "--help", action="store_true")
     pre_args, remaining_args = pre_parser.parse_known_args()
 
     if pre_args.help and not any("--tags" in arg for arg in remaining_args):
         help_text = ""
+        if pre_args.target == "run":
+            if pre_args.action == "docker":
+                pre_args.target = "script"
+            else:
+                logger.error(f"Invalid action-target {pre_args.action} - {pre_args.target} combination")
+                raise Exception(f"Invalid action-target {pre_args.action} - {pre_args.target} combination")
         if not pre_args.action and not pre_args.target:
             help_text += main.__doc__
         elif pre_args.action and not pre_args.target:
