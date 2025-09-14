@@ -206,7 +206,7 @@ jobs:
     - name: Test 22 - Test recursive mlc pull repo
       run: |
         export MLC_REPOS=$HOME/test
-        mlc pull repo https://github.com/GATEOverflow/GO-PDFs
+        mlcp https://github.com/GATEOverflow/GO-PDFs
         mlcr detect,os -j
 
   test_mlc_access_core_actions:

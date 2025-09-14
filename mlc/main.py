@@ -75,17 +75,26 @@ class Automation:
         #indices
 
 
-def mlcr():
-    first_arg_value = "run"
-    second_arg_value = "script"
+def mlc_expand_short(action, target = "script"):
 
     # Insert the positional argument into sys.argv for the main function
-    sys.argv.insert(1, first_arg_value)
-    sys.argv.insert(2, second_arg_value)
+    sys.argv.insert(1, action)
+    sys.argv.insert(2, target)
 
     # Call the main function
     main()
 
+def mlcr():
+    mlc_expand_short("run")
+def mlcd():
+    mlc_expand_short("docker")
+def mlce():
+    mlc_expand_short("experiment")
+def mlct():
+    mlc_expand_short("test")
+
+def mlcp():
+    mlc_expand_short("pull", "repo")
 
 
 def process_console_output(res, target, action, run_args):

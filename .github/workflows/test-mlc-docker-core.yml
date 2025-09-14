@@ -56,7 +56,7 @@ jobs:
 
     - name: Test --docker_cache 
       run: |
-        mlc docker run --tags=detect,os --docker_dt --docker_cache=no
+        mlcd detect,os --docker_dt --docker_cache=no
 
     - name: Test --docker_rebuild
       run: |
