@@ -357,7 +357,7 @@ jobs:
       matrix:
         python-version: ["3.13", "3.8"]
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
-        actions: ["r", "e", "t"]
+        action: ["mlcr", "mlce", "mlct"]
 
     steps:
     - uses: actions/checkout@v4
@@ -378,5 +378,5 @@ jobs:
         python -m pip install .
     - name: MLC ${{matrix.action}} script
       run: |
-        mlc pull repo mlcommons@mlperf-automations
-        mlc${{matrix.action}} detect,cpu
+        mlcp mlcommons@mlperf-automations
+        ${{matrix.action}} detect,cpu
