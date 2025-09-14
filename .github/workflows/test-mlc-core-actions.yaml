@@ -330,7 +330,7 @@ jobs:
         mlc find repo --help
         mlc pull repo --help
         mlc list repo --help
-        mlc rm repo -help
+        mlc rm repo --help
         mlc add repo -h
         mlc find repo -h
         mlc pull repo -h
