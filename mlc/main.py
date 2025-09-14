@@ -232,6 +232,8 @@ def main():
         return res
     
     run_args = res['args_dict']
+
+    run_args['mlc_run_cmd'] = " ".join(sys.argv)
     
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo

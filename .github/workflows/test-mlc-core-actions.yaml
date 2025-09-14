@@ -352,3 +352,8 @@ jobs:
         mlc rm cache -h
         mlc search cache -h
         mlc show cache -h
+    - name: MLC doc script
+      run: |
+        mlc pull repo mlcommons@mlperf-automations
+        mlc doc script --tags=detect,cpu
+        mlc doc script --all
