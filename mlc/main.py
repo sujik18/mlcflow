@@ -132,12 +132,63 @@ def main():
       
     For help related to a particular target, run: 
     
-    mlc help <target>
+    mlc <target> --help/-h
+
+    Examples:
+      mlc script --help
+      mlc repo -h
     
     For help related to a specific action for a target, run: 
     
-    mlc help <action> <target>
+    mlc <action> <target> --help/-h
+    Examples:
+      mlc run script --help
+      mlc pull repo -h
     """
+
+    # First level parser for showing help
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("action", nargs="?", help="Top-level action (run, build, help, etc.)")
+    pre_parser.add_argument("target", choices=['run', 'script', 'cache', 'repo'], nargs="?", help="Potential target (repo, script, cache, ...)")
+    pre_parser.add_argument("-h", "--help", action="store_true")
+    pre_args, remaining_args = pre_parser.parse_known_args()
+
+    if pre_args.help and not any("--tags" in arg for arg in remaining_args):
+        help_text = ""
+        if pre_args.target == "run":
+            if pre_args.action == "docker":
+                pre_args.target = "script"
+            else:
+                logger.error(f"Invalid action-target {pre_args.action} - {pre_args.target} combination")
+                raise Exception(f"Invalid action-target {pre_args.action} - {pre_args.target} combination")
+        if not pre_args.action and not pre_args.target:
+            help_text += main.__doc__
+        elif pre_args.action and not pre_args.target:
+            if pre_args.action not in ['script', 'cache', 'repo']:
+                logger.error(f"Invalid target {pre_args.action}")
+                raise Exception(f"""Invalid target {pre_args.action}""")
+            else:
+                pre_args.target, pre_args.action = pre_args.action, None
+            actions = get_action(pre_args.target, default_parent)
+            help_text += actions.__doc__
+            # iterate through every method
+            for method_name, method in inspect.getmembers(actions.__class__, inspect.isfunction):
+                method = getattr(actions, method_name)
+                if method.__doc__ and not method.__doc__.startswith("_"):
+                    help_text += method.__doc__
+        elif pre_args.action and pre_args.target:
+            actions = get_action(pre_args.target, default_parent)
+            try:
+                method = getattr(actions, pre_args.action)
+                help_text += actions.__doc__
+                help_text += method.__doc__
+            except:
+                logger.error(f"Error: '{pre_args.action}' is not supported for {pre_args.target}.")
+        if help_text != "":
+            print(help_text)
+        sys.exit(0)
+    
+    # parser for execution of the automation scripts
     parser = argparse.ArgumentParser(prog='mlc', description='A CLI tool for managing repos, scripts, and caches.', add_help=False)
 
     # Subparsers are added to main parser, allowing for different commands (subcommands) to be defined. 
@@ -146,7 +197,7 @@ def main():
 
     # Script and Cache-specific subcommands
     for action in ['run', 'pull', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
-        action_parser = subparsers.add_parser(action, help=f'{action} a target.')
+        action_parser = subparsers.add_parser(action, add_help=False)
         action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
         action_parser.add_argument('details', nargs='?', help='Details or identifier (optional for list).')
@@ -154,21 +205,15 @@ def main():
 
     # Script specific subcommands
     for action in ['docker', 'experiment', 'doc', 'lint']:
-        action_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
+        action_parser = subparsers.add_parser(action, add_help=False)
         action_parser.add_argument('target', choices=['script', 'run'], help='Target type (script).')
         # the argument given after target and before any extra options like --tags will be stored in "details"
         action_parser.add_argument('details', nargs='?', help='Details or identifier (optional for list).')
         action_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
 
     for action in ['load']:
-        load_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
+        load_parser = subparsers.add_parser(action, add_help=False)
         load_parser.add_argument('target', choices=['cfg'], help='Target type (cfg).')
-    
-    for action in ['help']:
-        action_parser = subparsers.add_parser(action, help=f'{action.capitalize()} a target.')
-        action_parser.add_argument('action', help='action type (run).', nargs='?', default=None)
-        action_parser.add_argument('target', choices=['script', 'cache', 'repo'], help='Target type (script).', nargs='?', default=None)
-        action_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
     
     # Parse arguments
     args = parser.parse_args()
@@ -200,47 +245,8 @@ def main():
         return res
     
     run_args = res['args_dict']
-    run_args['mlc_run_cmd'] = " ".join(sys.argv)
 
-    # handle help in mlcflow
-    if args.command in ['help']:
-        help_text = ""
-        if not args.action and not args.target:
-            help_text += main.__doc__
-        elif args.action and not args.target:
-            if args.action not in ['script', 'cache', 'repo']:
-                logger.error(f"Invalid target {args.action}")
-                raise Exception(f"""Invalid target {args.action}""")
-            else:
-                args.target, args.action = args.action, None
-            actions = get_action(args.target, default_parent)
-            help_text += actions.__doc__
-            # iterate through every method
-            for method_name, method in inspect.getmembers(actions.__class__, inspect.isfunction):
-                method = getattr(actions, method_name)
-                if method.__doc__ and not method.__doc__.startswith("_"):
-                    help_text += method.__doc__
-        elif args.action and args.target and run_args.get('tags'):
-            actions = get_action(args.target, default_parent)
-            if actions and hasattr(actions, args.command):
-                method = getattr(actions, args.command)
-                res = method(run_args)
-                if res['return'] > 0:
-                    logger.error(res.get('error', f"Error in {action}"))
-                    raise Exception(f"""An error occurred {res}""")
-            else:
-                logger.error(f"Error: '{args.command}' is not supported for {args.target}.")
-        elif args.action and args.target:
-            actions = get_action(args.target, default_parent)
-            try:
-                method = getattr(actions, args.action)
-                help_text += actions.__doc__
-                help_text += method.__doc__
-            except:
-                logger.error(f"Error: '{args.action}' is not supported for {args.target}.")
-        if help_text != "":
-            print(help_text)
-        sys.exit(0)
+    run_args['mlc_run_cmd'] = " ".join(sys.argv)
     
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
