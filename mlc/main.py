@@ -132,11 +132,18 @@ def main():
       
     For help related to a particular target, run: 
     
-    mlc help <target>
+    mlc <target> --help/-h
+
+    Examples:
+      mlc script --help
+      mlc repo -h
     
     For help related to a specific action for a target, run: 
     
-    mlc help <action> <target>
+    mlc <action> <target> --help/-h
+    Examples:
+      mlc run script --help
+      mlc pull repo -h
     """
 
     # First level parser for showing help
