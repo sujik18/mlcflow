@@ -49,6 +49,7 @@ class CacheAction(Action):
 
         for item in r['list']:
             item_meta = item.meta
+            '''#handled in script automation now
             dep = item_meta.get('dependent_cached_path')
             if dep and not os.path.exists(dep):
                 continue  # skip item
@@ -56,6 +57,7 @@ class CacheAction(Action):
             deps = item_meta.get('dependent_cached_paths', '').split(',')
             if any(d and not os.path.exists(d) for d in deps):
                 continue  # skip item
+            '''
 
             expiration_time = item_meta.get('expiration_time')
             if expiration_time is not None and expiration_time < time.time():
