@@ -7,7 +7,8 @@ on:
       - '.github/workflows/test-mlc-docker-core.yml'
       - '**'
       - '!**.md'
-
+permissions:
+  contents: read
 jobs:
   test_mlc_docker_core:
 
