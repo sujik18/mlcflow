@@ -312,9 +312,9 @@ jobs:
         mlc show script --help
         mlc test script --help
         mlc add script -h
-        mlc docker scrip -h
+        mlc docker script -h
         mlc find script -h
-        mlc search scrip -h
+        mlc search script -h
         mlc list script -h
         mlc rm script -h
         mlc run script -h
