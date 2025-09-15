@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 import inspect
-
+import shlex
 from . import utils
 
 from .action import Action, default_parent
@@ -255,7 +255,7 @@ def main():
     
     run_args = res['args_dict']
 
-    run_args['mlc_run_cmd'] = " ".join(sys.argv)
+    run_args['mlc_run_cmd'] = " ".join(shlex.quote(arg) for arg in sys.argv)
     
     if hasattr(args, 'repo') and args.repo:
         run_args['repo'] = args.repo
