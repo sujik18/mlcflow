@@ -162,40 +162,6 @@ def main():
     pre_parser.add_argument("-h", "--help", action="store_true")
     pre_args, remaining_args = pre_parser.parse_known_args()
 
-    if pre_args.help and not any("--tags" in arg for arg in remaining_args):
-        help_text = ""
-        if pre_args.target == "run":
-            if pre_args.action == "docker":
-                pre_args.target = "script"
-            else:
-                logger.error(f"Invalid action-target {pre_args.action} - {pre_args.target} combination")
-                raise Exception(f"Invalid action-target {pre_args.action} - {pre_args.target} combination")
-        if not pre_args.action and not pre_args.target:
-            help_text += main.__doc__
-        elif pre_args.action and not pre_args.target:
-            if pre_args.action not in ['script', 'cache', 'repo']:
-                logger.error(f"Invalid target {pre_args.action}")
-                raise Exception(f"""Invalid target {pre_args.action}""")
-            else:
-                pre_args.target, pre_args.action = pre_args.action, None
-            actions = get_action(pre_args.target, default_parent)
-            help_text += actions.__doc__
-            # iterate through every method
-            for method_name, method in inspect.getmembers(actions.__class__, inspect.isfunction):
-                method = getattr(actions, method_name)
-                if method.__doc__ and not method.__doc__.startswith("_"):
-                    help_text += method.__doc__
-        elif pre_args.action and pre_args.target:
-            actions = get_action(pre_args.target, default_parent)
-            try:
-                method = getattr(actions, pre_args.action)
-                help_text += actions.__doc__
-                help_text += method.__doc__
-            except:
-                logger.error(f"Error: '{pre_args.action}' is not supported for {pre_args.target}.")
-        if help_text != "":
-            print(help_text)
-        sys.exit(0)
     
     # parser for execution of the automation scripts
     parser = argparse.ArgumentParser(prog='mlc', description='A CLI tool for managing repos, scripts, and caches.', add_help=False)
@@ -281,6 +247,41 @@ def main():
             run_args['src'] = args.details
         if hasattr(args, 'extra') and args.extra:
             run_args['dest'] = args.extra[0]
+
+    if pre_args.help and not "tags" in run_args:
+        help_text = ""
+        if pre_args.target == "run":
+            if pre_args.action == "docker":
+                pre_args.target = "script"
+            else:
+                logger.error(f"Invalid action-target {pre_args.action} - {pre_args.target} combination")
+                raise Exception(f"Invalid action-target {pre_args.action} - {pre_args.target} combination")
+        if not pre_args.action and not pre_args.target:
+            help_text += main.__doc__
+        elif pre_args.action and not pre_args.target:
+            if pre_args.action not in ['script', 'cache', 'repo']:
+                logger.error(f"Invalid target {pre_args.action}")
+                raise Exception(f"""Invalid target {pre_args.action}""")
+            else:
+                pre_args.target, pre_args.action = pre_args.action, None
+            actions = get_action(pre_args.target, default_parent)
+            help_text += actions.__doc__
+            # iterate through every method
+            for method_name, method in inspect.getmembers(actions.__class__, inspect.isfunction):
+                method = getattr(actions, method_name)
+                if method.__doc__ and not method.__doc__.startswith("_"):
+                    help_text += method.__doc__
+        elif pre_args.action and pre_args.target:
+            actions = get_action(pre_args.target, default_parent)
+            try:
+                method = getattr(actions, pre_args.action)
+                help_text += actions.__doc__
+                help_text += method.__doc__
+            except:
+                logger.error(f"Error: '{pre_args.action}' is not supported for {pre_args.target}.")
+        if help_text != "":
+            print(help_text)
+        sys.exit(0)
 
     # Get the action handler for other commands
     action = get_action(args.target, default_parent)
