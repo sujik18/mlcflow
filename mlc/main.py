@@ -115,7 +115,83 @@ def process_console_output(res, target, action, run_args):
 if default_parent is None:
     default_parent = Action()
 
-# Main CLI function
+
+log_flag_aliases = {'-v': '--verbose', '-s': '--silent'}
+log_levels = {'--verbose': logging.DEBUG, '--silent': logging.WARNING}
+
+
+def build_pre_parser():
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("action", nargs="?", help="Top-level action (run, build, help, etc.)")
+    pre_parser.add_argument("target", choices=['run', 'script', 'cache', 'repo'], nargs="?", help="Target (repo, script, cache, ...)")
+    pre_parser.add_argument("-h", "--help", action="store_true")
+    return pre_parser
+
+
+def build_parser(pre_args):
+    parser = argparse.ArgumentParser(prog="mlc", description="Manage repos, scripts, and caches.", add_help=False)
+    subparsers = parser.add_subparsers(dest="command", required=not pre_args.help)
+
+    # General commands
+    for action in ['run', 'pull', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv', 'help']:
+        p = subparsers.add_parser(action, add_help=False)
+        p.add_argument('target', choices=['repo', 'script', 'cache'])
+        p.add_argument('details', nargs='?', help='Details or identifier (optional)')
+        p.add_argument('extra', nargs=argparse.REMAINDER)
+
+    # Script-only
+    for action in ['docker', 'experiment', 'doc', 'lint']:
+        p = subparsers.add_parser(action, add_help=False)
+        p.add_argument('target', choices=['script', 'run'])
+        p.add_argument('details', nargs='?', help='Details or identifier (optional)')
+        p.add_argument('extra', nargs=argparse.REMAINDER)
+
+    # Load cfg
+    load_parser = subparsers.add_parser("load", add_help=False)
+    load_parser.add_argument("target", choices=["cfg"])
+    return parser
+
+
+def configure_logging(args):
+    if hasattr(args, 'extra') and args.extra:
+        args.extra[:] = [log_flag_aliases.get(a, a) for a in args.extra]
+        for flag, level in log_levels.items():
+            if flag in args.extra:
+                logging.getLogger().setLevel(level)
+                args.extra.remove(flag)
+
+
+def build_run_args(args):
+    res = utils.convert_args_to_dictionary(getattr(args, 'extra', []))
+    if res['return'] > 0:
+        return res
+
+    run_args = res['args_dict']
+    run_args['mlc_run_cmd'] = shlex.join(sys.argv)
+
+    if args.command in ['pull', 'rm', 'add', 'find'] and args.target == "repo":
+        run_args['repo'] = args.details
+
+    if args.command in ['docker', 'experiment', 'doc', 'lint'] and args.target == "run":
+        run_args['target'] = 'script'
+        args.target = "script"
+
+    if args.details and not utils.is_uid(args.details) and not run_args.get("tags") and args.target in ["script", "cache"]:
+        run_args['tags'] = args.details
+
+    if not run_args.get('details') and args.details:
+        run_args['details'] = args.details
+
+    if args.command in ["cp", "mv"]:
+        run_args['target'] = args.target
+        if args.details:
+            run_args['src'] = args.details
+        if args.extra:
+            run_args['dest'] = args.extra[0]
+
+    return run_args
+
+
 def main():
     """
     MLCFlow is a CLI tool for managing repos, scripts, and caches.
@@ -154,99 +230,14 @@ def main():
       mlc run script --help
       mlc pull repo -h
     """
-
-    # First level parser for showing help
-    pre_parser = argparse.ArgumentParser(add_help=False)
-    pre_parser.add_argument("action", nargs="?", help="Top-level action (run, build, help, etc.)")
-    pre_parser.add_argument("target", choices=['run', 'script', 'cache', 'repo'], nargs="?", help="Potential target (repo, script, cache, ...)")
-    pre_parser.add_argument("-h", "--help", action="store_true")
+    pre_parser = build_pre_parser()
     pre_args, remaining_args = pre_parser.parse_known_args()
 
-    
-    # parser for execution of the automation scripts
-    parser = argparse.ArgumentParser(prog='mlc', description='A CLI tool for managing repos, scripts, and caches.', add_help=False)
+    parser = build_parser(pre_args)
+    args = parser.parse_args() if remaining_args or pre_args.action else pre_args
 
-    # Subparsers are added to main parser, allowing for different commands (subcommands) to be defined. 
-    # The chosen subcommand will be stored in the "command" attribute of the parsed arguments.
-    subparsers = parser.add_subparsers(dest='command', required=True)
-
-    # Script and Cache-specific subcommands
-    for action in ['run', 'pull', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv']:
-        action_parser = subparsers.add_parser(action, add_help=False)
-        action_parser.add_argument('target', choices=['repo', 'script', 'cache'], help='Target type (repo, script, cache).')
-        # the argument given after target and before any extra options like --tags will be stored in "details"
-        action_parser.add_argument('details', nargs='?', help='Details or identifier (optional for list).')
-        action_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
-
-    # Script specific subcommands
-    for action in ['docker', 'experiment', 'doc', 'lint']:
-        action_parser = subparsers.add_parser(action, add_help=False)
-        action_parser.add_argument('target', choices=['script', 'run'], help='Target type (script).')
-        # the argument given after target and before any extra options like --tags will be stored in "details"
-        action_parser.add_argument('details', nargs='?', help='Details or identifier (optional for list).')
-        action_parser.add_argument('extra', nargs=argparse.REMAINDER, help='Extra options (e.g.,  -v)')
-
-    for action in ['load']:
-        load_parser = subparsers.add_parser(action, add_help=False)
-        load_parser.add_argument('target', choices=['cfg'], help='Target type (cfg).')
-    
-    # Parse arguments
-    args = parser.parse_args()
-
-    #logger.info(f"Args = {args}")
-
-    # set log level for MLCFlow if -v/--verbose or -s/--silent is specified
-    log_flag_aliases = {
-        '-v': '--verbose',
-        '-s': '--silent'
-        }
-    
-    log_levels = {
-        '--verbose': logging.DEBUG,
-        '--silent': logging.WARNING
-        }
-
-    # Modify args.extra in place
-    args.extra[:] = [log_flag_aliases.get(arg, arg) for arg in args.extra]
-
-    # Set log level based on the first matching flag
-    for flag, level in log_levels.items():
-        if flag in args.extra:
-            logger.setLevel(level)
-            args.extra.remove(flag)
-
-    res = utils.convert_args_to_dictionary(args.extra)
-    if res['return'] > 0:
-        return res
-    
-    run_args = res['args_dict']
-
-    run_args['mlc_run_cmd'] = " ".join(shlex.quote(arg) for arg in sys.argv)
-    
-    if hasattr(args, 'repo') and args.repo:
-        run_args['repo'] = args.repo
-        
-    if args.command in ['pull', 'rm', 'add', 'find']:
-        if args.target == "repo":
-            run_args['repo'] = args.details
-  
-    if args.command in ['docker', 'experiment', 'doc', 'lint']:
-        if args.target == "run":
-            run_args['target'] = 'script' #allowing run to be used for docker run instead of docker script
-            args.target = "script"
-
-    if hasattr(args, 'details') and args.details and not utils.is_uid(args.details) and not run_args.get("tags") and args.target in ["script", "cache"]:
-        run_args['tags'] = args.details
-
-    if not run_args.get('details') and args.details:
-        run_args['details'] = args.details
-
-    if args.command in ["cp", "mv"]:
-        run_args['target'] = args.target
-        if hasattr(args, 'details') and args.details:
-            run_args['src'] = args.details
-        if hasattr(args, 'extra') and args.extra:
-            run_args['dest'] = args.extra[0]
+    configure_logging(args)
+    run_args = build_run_args(args) if hasattr(args, "command") else {}
 
     if pre_args.help and not "tags" in run_args:
         help_text = ""
@@ -283,18 +274,19 @@ def main():
             print(help_text)
         sys.exit(0)
 
-    # Get the action handler for other commands
     action = get_action(args.target, default_parent)
-    # Dynamically call the method (e.g., run, list, show)
-    if action and hasattr(action, args.command):
-        method = getattr(action, args.command)
-        res = method(run_args)
-        if res['return'] > 0:
-            logger.error(res.get('error', f"Error in {action}"))
-            raise Exception(f"""An error occurred {res}""")
-        process_console_output(res, args.target, args.command, run_args)
-    else:
-        logger.error(f"Error: '{args.command}' is not supported for {args.target}.")
+
+    if not action or not hasattr(action, args.command):
+        logging.error("Error: '%s' is not supported for %s.", args.command, args.target)
+        sys.exit(1)
+
+    method = getattr(action, args.command)
+    res = method(run_args)
+    if res['return'] > 0:
+        logging.error(res.get('error', f"Error in {action}"))
+        raise Exception(f"An error occurred {res}")
+
+    process_console_output(res, args.target, args.command, run_args)
 
 if __name__ == '__main__':
     main()
