@@ -206,7 +206,7 @@ jobs:
     - name: Test 22 - Test recursive mlc pull repo
       run: |
         export MLC_REPOS=$HOME/test
-        mlc pull repo https://github.com/GATEOverflow/GO-PDFs
+        mlcp https://github.com/GATEOverflow/GO-PDFs
         mlcr detect,os -j
 
   test_mlc_access_core_actions:
@@ -271,9 +271,6 @@ jobs:
       matrix:
         python-version: ["3.12", "3.8"]
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
-        exclude:
-          - os: windows-latest
-          - os: macos-latest
 
     steps:
     - uses: actions/checkout@v4
@@ -294,38 +291,92 @@ jobs:
         python -m pip install .
     - name: MLC intro
       run: |
-        mlc help
+        mlc --help
+        mlc -h
     - name: MLC scripts - full
       run: |
-        mlc help script
+        mlc script --help
+        mlc script --h
     - name: MLC scripts - individual actions
       run: |
-        mlc help add script
-        mlc help docker script
-        mlc help find script
-        mlc help search script
-        mlc help list script
-        mlc help rm script
-        mlc help run script
-        mlc help show script
-        mlc help test script
+        mlc add script --help
+        mlc docker script --help
+        mlc find script --help
+        mlc search script --help
+        mlc list script --help
+        mlc rm script --help
+        mlc run script --help
+        mlc show script --help
+        mlc test script --help
+        mlc add script -h
+        mlc docker script -h
+        mlc find script -h
+        mlc search script -h
+        mlc list script -h
+        mlc rm script -h
+        mlc run script -h
+        mlc show script -h
+        mlc test script -h
     - name: MLC repos - full
       run: |
-        mlc help repo
+        mlc repo --help
+        mlc repo -h
     - name: MLC repos - individual actions
       run: |
-        mlc help add repo
-        mlc help find repo
-        mlc help pull repo
-        mlc help list repo
-        mlc help rm repo
+        mlc add repo --help
+        mlc find repo --help
+        mlc pull repo --help
+        mlc list repo --help
+        mlc rm repo --help
+        mlc add repo -h
+        mlc find repo -h
+        mlc pull repo -h
+        mlc list repo -h
+        mlc rm repo -h
     - name: MLC cache - full
       run: |
-        mlc help cache
+        mlc cache --help
+        mlc cache -h
     - name: MLC cache - individual actions
       run: |
-        mlc help find cache
-        mlc help list cache
-        mlc help rm cache
-        mlc help search cache
-        mlc help show cache
+        mlc find cache --help
+        mlc list cache --help
+        mlc rm cache --help
+        mlc search cache --help
+        mlc show cache --help
+        mlc find cache -h
+        mlc list cache -h
+        mlc rm cache -h
+        mlc search cache -h
+        mlc show cache -h
+  
+  test_mlc_script_actions:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.8"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        action: ["mlcr", "mlce", "mlct"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Configure git longpaths (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        git config --system core.longpaths true
+
+    - name: Install mlcflow from the pull request's source repository and branch
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --ignore-installed --verbose pip setuptools
+        python -m pip install .
+    - name: MLC ${{matrix.action}} script
+      run: |
+        mlcp mlcommons@mlperf-automations
+        ${{matrix.action}} detect,cpu
