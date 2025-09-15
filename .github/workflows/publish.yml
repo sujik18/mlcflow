@@ -9,7 +9,7 @@ on:
       - main
       - dev
 permissions:
-  contents: read
+  contents: write
 jobs:
   publish:
     name: Publish the site
