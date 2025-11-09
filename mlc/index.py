@@ -47,7 +47,7 @@ class Index:
         """
         if os.path.exists(self.modified_times_file):
             try:
-                logger.info(f"Loading modified times from {self.modified_times_file}")
+                # logger.info(f"Loading modified times from {self.modified_times_file}")
                 with open(self.modified_times_file, "r") as f:
                     return json.load(f)
             except Exception:
@@ -69,22 +69,11 @@ class Index:
         for folder_type, file_path in self.index_files.items():
             if os.path.exists(file_path):
                 try:
-                    logger.info(f"Loading existing index for {folder_type}")
+                    # logger.info(f"Loading existing index for {folder_type}")
                     with open(file_path, "r") as f:
                         self.indices[folder_type] = json.load(f)
                 except Exception:
                     pass   # fall back to empty index
-
-    def _replace_or_add(self, folder_type, path, entry):
-        """
-        Replace index entry for a script or append.
-        """
-        for i, item in enumerate(self.indices[folder_type]):
-            if os.path.normpath(item["path"]) == os.path.normpath(path):
-                logger.info(f"Replacing index entry for {path}")
-                self.indices[folder_type][i] = entry
-                return
-        self.indices[folder_type].append(entry)
 
     def add(self, meta, folder_type, path, repo):
         if not repo:
@@ -157,6 +146,7 @@ class Index:
 
         # track all currently detected script paths
         current_script_keys = set()
+        changed = False
 
         #for repo in os.listdir(self.repos_path):
         for repo in self.repos:
@@ -201,7 +191,7 @@ class Index:
                                 "mtime": mtime,
                                 "date_time": datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
                             }
-
+                            changed = True
                             # script changed, so reindex
                             self._process_config_file(config_path, folder_type, automation_path, repo)
                             break  # Only process one config file per automation_dir
@@ -211,9 +201,15 @@ class Index:
         deleted_keys = old_keys - current_script_keys
         for key in deleted_keys:
             del self.modified_times[key]
+            changed = True
 
-        self._save_modified_times()
-        self._save_indices()
+        if changed:
+            self._save_modified_times()
+            self._save_indices()
+            logger.info("Index updated (changes detected).")
+        else:
+            logger.debug("Index unchanged (no changes detected).")
+
 
     def _delete_by_uid(self, folder_type, uid, alias):
         """
@@ -278,8 +274,7 @@ class Index:
                 return
             
             self._delete_by_uid(folder_type, unique_id, alias)
-            # Replace or add to index_script json file
-            self._replace_or_add(folder_type, folder_path, entry)
+            self.indices[folder_type].append(entry)
 
         except Exception as e:
             logger.error(f"Error processing {config_file}: {e}")
