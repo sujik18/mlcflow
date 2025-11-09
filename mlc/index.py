@@ -258,19 +258,17 @@ class Index:
 
             # Validate and add to indices
             if unique_id:
-                entry = {
+                self._delete_by_uid(folder_type, unique_id, alias)
+                self.indices[folder_type].append({
                     "uid": unique_id,
                     "tags": tags,
                     "alias": alias,
                     "path": folder_path,
                     "repo": repo
-                }
+                })
             else:
                 logger.info(f"Skipping {config_file}: Missing 'uid' field.")
                 return
-            
-            self._delete_by_uid(folder_type, unique_id, alias)
-            self.indices[folder_type].append(entry)
 
         except Exception as e:
             logger.error(f"Error processing {config_file}: {e}")
