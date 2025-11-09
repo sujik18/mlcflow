@@ -72,6 +72,11 @@ class Index:
                     # logger.info(f"Loading existing index for {folder_type}")
                     with open(file_path, "r") as f:
                         self.indices[folder_type] = json.load(f)
+                    # Convert repo dicts back into Repo objects
+                    for item in self.indices[folder_type]:
+                        if isinstance(item.get("repo"), dict):
+                            item["repo"] = Repo(**item["repo"])
+
                 except Exception:
                     pass   # fall back to empty index
 
