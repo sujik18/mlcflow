@@ -177,9 +177,6 @@ class Index:
                             old = self.modified_times.get(key)
                             old_mtime = old["mtime"] if isinstance(old, dict) else old
 
-                            if old_mtime == mtime:
-                                continue
-
                             # skip if unchanged
                             if old_mtime == mtime:
                                 continue
@@ -268,7 +265,6 @@ class Index:
                     "path": folder_path,
                     "repo": repo
                 }
-                self.indices[folder_type].append(entry)
             else:
                 logger.info(f"Skipping {config_file}: Missing 'uid' field.")
                 return
