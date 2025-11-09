@@ -3,6 +3,7 @@ import os
 import json
 import yaml
 from .repo import Repo
+from datetime import datetime
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -135,7 +136,6 @@ class Index:
             del(self.indices[folder_type][index])
         self._save_indices()
 
-    # --- NEW
     def get_script_mtime(self,folder):
         # logger.info(f"Getting latest modified time for folder: {folder}")
         latest = 0
@@ -183,7 +183,12 @@ class Index:
                             key = f"{repo_path}/{folder_type}/{automation_dir}"
                             current_script_keys.add(key)
                             mtime = self.get_script_mtime(automation_path)
-                            old_mtime = self.modified_times.get(key, None)
+
+                            old = self.modified_times.get(key)
+                            old_mtime = old["mtime"] if isinstance(old, dict) else old
+
+                            if old_mtime == mtime:
+                                continue
 
                             # skip if unchanged
                             if old_mtime == mtime:
@@ -191,7 +196,11 @@ class Index:
 
                             # update mtime
                             logger.info("Script is modified, index getting updated")
-                            self.modified_times[key] = mtime
+
+                            self.modified_times[key] = {
+                                "mtime": mtime,
+                                "date_time": datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+                            }
 
                             # script changed, so reindex
                             self._process_config_file(config_path, folder_type, automation_path, repo)
@@ -206,11 +215,11 @@ class Index:
         self._save_modified_times()
         self._save_indices()
 
-    def _delete_by_uid(self, folder_type, uid):
+    def _delete_by_uid(self, folder_type, uid, alias):
         """
         Delete old index entry using UID (prevents duplicates).
         """
-        logger.info(f"Deleting index entry for {uid}")
+        logger.info(f"Deleting and updating index entry for the script {alias} with UID {uid}")
         self.indices[folder_type] = [
             item for item in self.indices[folder_type]
             if item["uid"] != uid
@@ -268,8 +277,8 @@ class Index:
                 logger.info(f"Skipping {config_file}: Missing 'uid' field.")
                 return
             
-            self._delete_by_uid(folder_type, unique_id)
-            # Replace or add to index_scipt json file
+            self._delete_by_uid(folder_type, unique_id, alias)
+            # Replace or add to index_script json file
             self._replace_or_add(folder_type, folder_path, entry)
 
         except Exception as e:
