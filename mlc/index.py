@@ -35,7 +35,55 @@ class Index:
             "experiment": os.path.join(repos_path, "index_experiment.json")
         }
         self.indices = {key: [] for key in self.index_files.keys()}
+        self.modified_times_file = os.path.join(repos_path, "modified_times.json")
+        self.modified_times = self._load_modified_times()
+        self._load_existing_index()
         self.build_index()
+
+    def _load_modified_times(self):
+        """
+        Load stored mtimes to check for changes in scripts.
+        """
+        if os.path.exists(self.modified_times_file):
+            try:
+                logger.info(f"Loading modified times from {self.modified_times_file}")
+                with open(self.modified_times_file, "r") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def _save_modified_times(self):
+        """
+        Save updated mtimes in modified_times json file.
+        """
+        logger.info(f"Saving modified times to {self.modified_times_file}")
+        with open(self.modified_times_file, "w") as f:
+            json.dump(self.modified_times, f, indent=4)
+
+    def _load_existing_index(self):
+        """
+        Load previously saved index to allow incremental updates.
+        """
+        for folder_type, file_path in self.index_files.items():
+            if os.path.exists(file_path):
+                try:
+                    logger.info(f"Loading existing index for {folder_type}")
+                    with open(file_path, "r") as f:
+                        self.indices[folder_type] = json.load(f)
+                except Exception:
+                    pass   # fall back to empty index
+
+    def _replace_or_add(self, folder_type, path, entry):
+        """
+        Replace index entry for a script or append.
+        """
+        for i, item in enumerate(self.indices[folder_type]):
+            if os.path.normpath(item["path"]) == os.path.normpath(path):
+                logger.info(f"Replacing index entry for {path}")
+                self.indices[folder_type][i] = entry
+                return
+        self.indices[folder_type].append(entry)
 
     def add(self, meta, folder_type, path, repo):
         if not repo:
@@ -87,6 +135,18 @@ class Index:
             del(self.indices[folder_type][index])
         self._save_indices()
 
+    # --- NEW
+    def get_script_mtime(self,folder):
+        # logger.info(f"Getting latest modified time for folder: {folder}")
+        latest = 0
+        for root, _, files in os.walk(folder):
+            for f in files:
+                fp = os.path.join(root, f)
+                t = os.path.getmtime(fp)
+                if t > latest:
+                    latest = t
+        return latest
+    
     def build_index(self):
         """
         Build shared indices for script, cache, and experiment folders across all repositories.
@@ -95,9 +155,12 @@ class Index:
             None
         """
 
+        # track all currently detected script paths
+        current_script_keys = set()
+
         #for repo in os.listdir(self.repos_path):
         for repo in self.repos:
-            repo_path = repo.path#os.path.join(self.repos_path, repo)
+            repo_path = repo.path #os.path.join(self.repos_path, repo)
             if not os.path.isdir(repo_path):
                 continue
 
@@ -116,10 +179,42 @@ class Index:
                     # Check for configuration files (meta.yaml or meta.json)
                     for config_file in ["meta.yaml", "meta.json"]:
                         config_path = os.path.join(automation_path, config_file)
-                        if os.path.isfile(config_path):
+                        if os.path.isfile(config_path):   
+                            key = f"{repo_path}/{folder_type}/{automation_dir}"
+                            current_script_keys.add(key)
+                            mtime = self.get_script_mtime(automation_path)
+                            old_mtime = self.modified_times.get(key, None)
+
+                            # skip if unchanged
+                            if old_mtime == mtime:
+                                continue
+
+                            # update mtime
+                            logger.info("Script is modified, index getting updated")
+                            self.modified_times[key] = mtime
+
+                            # script changed, so reindex
                             self._process_config_file(config_path, folder_type, automation_path, repo)
                             break  # Only process one config file per automation_dir
+
+        # remove deleted scripts
+        old_keys = set(self.modified_times.keys())
+        deleted_keys = old_keys - current_script_keys
+        for key in deleted_keys:
+            del self.modified_times[key]
+
+        self._save_modified_times()
         self._save_indices()
+
+    def _delete_by_uid(self, folder_type, uid):
+        """
+        Delete old index entry using UID (prevents duplicates).
+        """
+        logger.info(f"Deleting index entry for {uid}")
+        self.indices[folder_type] = [
+            item for item in self.indices[folder_type]
+            if item["uid"] != uid
+        ]
 
     def _process_config_file(self, config_file, folder_type, folder_path, repo):
         """
@@ -133,6 +228,15 @@ class Index:
         Returns:
             None
         """
+        for cf in ("meta.yaml", "meta.json"):
+            p = os.path.join(folder_path, cf)
+            if os.path.isfile(p):
+                config_file = p
+                break
+
+        if not config_file:
+            return
+
         try:
             # Determine the file type based on the extension
             if config_file.endswith(".yaml") or config_file.endswith(".yml"):
@@ -152,15 +256,22 @@ class Index:
 
             # Validate and add to indices
             if unique_id:
-                self.indices[folder_type].append({
+                entry = {
                     "uid": unique_id,
                     "tags": tags,
                     "alias": alias,
                     "path": folder_path,
                     "repo": repo
-                })
+                }
+                self.indices[folder_type].append(entry)
             else:
                 logger.info(f"Skipping {config_file}: Missing 'uid' field.")
+                return
+            
+            self._delete_by_uid(folder_type, unique_id)
+            # Replace or add to index_scipt json file
+            self._replace_or_add(folder_type, folder_path, entry)
+
         except Exception as e:
             logger.error(f"Error processing {config_file}: {e}")
 
