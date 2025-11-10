@@ -4,11 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mlcflow"
-version = "1.0.23"
+version = "1.1.8"
 
-
-
-description = "An automation interface for ML applications"
+description = "An automation interface tailored for CPU/GPU benchmarking"
 authors = [
     { name = "MLCommons", email = "systems@mlcommons.org" }
 ]
@@ -47,6 +45,7 @@ py-modules = []
 [project.scripts]
 mlc = "mlc.main:main"
 mlcr = "mlc.main:mlcr"
+mlcrr = "mlc.main:mlcrr"
 mlcd = "mlc.main:mlcd"
 mlce = "mlc.main:mlce"
 mlct = "mlc.main:mlct"

@@ -219,7 +219,25 @@ Main Script Meta:""")
         # Import script submodule 
         script_path = self.find_target_folder("script")
         if not script_path:
-            return {'return': 1, 'error': f"""Script automation not found. Have you done "mlc pull repo mlcommons@mlperf-automations --branch=dev"?"""}
+            logger.warning("Script automation not found. Automatically pulling mlcommons@mlperf-automations repository...")
+            
+            # Use the access method to pull the required repository
+            result = self.access({
+                "automation": "repo",
+                "action": "pull",
+                "repo": "mlcommons@mlperf-automations",
+                "branch": "dev"
+            })
+            
+            if result['return'] == 0:
+                # Try to find the script path again after pulling
+                script_path = self.find_target_folder("script")
+                if not script_path:
+                    return {'return': 1, 'error': f"""Script automation still not found after pulling mlcommons@mlperf-automations --branch=dev."""}
+            else:
+                # If pull failed, return the original error with additional info
+                logger.error(f"Failed to pull mlcommons@mlperf-automations repository: {result.get('error', 'Unknown error')}")
+                return {'return': 1, 'error': f"""Script automation not found and failed to automatically pull mlcommons@mlperf-automations --branch=dev. Please run "mlc pull repo mlcommons@mlperf-automations --branch=dev" manually: {result.get('error', 'Unknown error')}"""}
 
         module_path = os.path.join(script_path, "module.py")
         module = self.dynamic_import_module(module_path)
@@ -235,6 +253,8 @@ Main Script Meta:""")
                 result = automation_instance.test(run_args)  # Pass args to the run method
             elif function_name == "experiment":
                 result = automation_instance.experiment(run_args)  # Pass args to the experiment method
+            elif function_name == "remote_run":
+                result = automation_instance.remote_run(run_args)  # Pass args to the experiment method
             elif function_name == "help":
                 result = automation_instance.help(run_args)  # Pass args to the help method
             elif function_name == "doc":
@@ -253,6 +273,9 @@ Main Script Meta:""")
             return {'return': 1, 'error': 'ScriptAutomation class not found in the script.'}
 
     def docker(self, run_args):
+        return self.docker_run(run_args)
+
+    def docker_run(self, run_args):
         """
     ####################################################################################################################
     Target: Script
@@ -289,6 +312,30 @@ Main Script Meta:""")
 
         """
         return self.call_script_module_function("docker", run_args)
+
+    def remote_run(self, run_args):
+        """
+    ####################################################################################################################
+    Target: Script
+    Action: remote-run
+    ####################################################################################################################
+
+    The `remote-run` action runs a shell command on a remote machine via ssh connection.  
+
+
+    Flags Available:
+
+    1. --remote_host:
+        IP or hostnanme for the remote machine
+    2. --remote_port:
+        ssh port for the remote machineIP or hostnanme for the remote machine
+
+    Example Command:
+
+    mlc remote-run script --tags=detect,os -j
+
+        """
+        return self.call_script_module_function("remote_run", run_args)
 
 
     def run(self, run_args):

@@ -57,7 +57,7 @@ Each target has its own set of specific actions to tailor automation workflows a
 
 | Target | Action          |
 |--------|-----------------|
-| script    | run, find/search, rm, mv, cp, add, test, docker, show       |
+| script    | run, find/search, rm, mv, cp, add, test, docker-run, show, experiment, doc   |
 | cache    | find/search, rm, show  |
 | repo    | pull, search, rm, list, find/search , add        |
 
@@ -115,9 +115,6 @@ classDiagram
         +show(args)
         +list(args)
     }
-    class CfgAction {
-        +load(args)
-    }
     class Index {
         +add(meta, folder_type, path, repo)
         +get_index(folder_type, uid)
@@ -148,8 +145,6 @@ classDiagram
     Action <|-- RepoAction
     Action <|-- ScriptAction
     Action <|-- CacheAction
-    Action <|-- ExperimentAction
-    Action <|-- CfgAction
     RepoAction o-- Repo
     ScriptAction o-- Automation
     CacheAction o-- Index
