@@ -125,6 +125,14 @@ if default_parent is None:
 log_flag_aliases = {'-v': '--verbose', '-s': '--silent'}
 log_levels = {'--verbose': logging.DEBUG, '--silent': logging.WARNING}
 
+def convert_hyphen_to_underscore_in_args():
+    for i, arg in enumerate(sys.argv):
+        if arg.startswith("--") and "=" not in arg:
+            prefix = "--"
+            rest = arg[2:].replace("-", "_")
+            a = prefix + rest
+            sys.argv[i] = a
+
 
 def build_pre_parser():
     pre_parser = argparse.ArgumentParser(add_help=False)
@@ -265,6 +273,7 @@ def main():
     """
     
     check_raw_arguments_for_non_ascii()
+    convert_hyphen_to_underscore_in_args()
 
     pre_parser = build_pre_parser()
     pre_args, remaining_args = pre_parser.parse_known_args()
