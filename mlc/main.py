@@ -125,6 +125,21 @@ if default_parent is None:
 log_flag_aliases = {'-v': '--verbose', '-s': '--silent'}
 log_levels = {'--verbose': logging.DEBUG, '--silent': logging.WARNING}
 
+def convert_hyphen_to_underscore_in_args():
+    for i, arg in enumerate(sys.argv):
+        if arg.startswith("--"):
+            # Split --option=value into ("option", "value")
+            if "=" in arg:
+                name, value = arg[2:].split("=", 1)
+                new_name = name.replace("-", "_") if "." not in name else name
+                sys.argv[i] = f"--{new_name}={value}"
+            else:
+                # No value: just convert the option name
+                name = arg[2:]
+                new_name = name.replace("-", "_")
+                sys.argv[i] = f"--{new_name}"
+
+
 
 def build_pre_parser():
     pre_parser = argparse.ArgumentParser(add_help=False)
@@ -200,6 +215,30 @@ def build_run_args(args):
 
     return run_args
 
+def is_quoted(arg):
+    return (arg.startswith("'") and arg.endswith("'")) or \
+           (arg.startswith('"') and arg.endswith('"'))
+
+def check_raw_arguments_for_non_ascii():
+    bad_args = []
+
+    # Skip sys.argv[0] (script name)
+    for arg in sys.argv[1:]:
+        if is_quoted(arg):
+            continue  # allow non-ASCII inside quotes
+        for ch in arg:
+            if ord(ch) > 127:   # non-ASCII
+                bad_args.append((arg, ch, unicodedata.name(ch, "UNKNOWN")))
+                break  # report each arg once
+
+    if bad_args:
+        print("\n⚠️  ERROR: Non-ASCII characters detected in command-line arguments!\n")
+        for arg, ch, name in bad_args:
+            print(f"  → Argument: {arg}")
+            print(f"    Contains non-ASCII character: '{ch}' ({name})")
+        print("\nThis often happens due to copy-paste from PDFs or documents.\n"
+              "Please retype the arguments using plain ASCII.\n")
+        sys.exit(1)
 
 def main():
     """
@@ -239,6 +278,10 @@ def main():
       mlc run script --help
       mlc pull repo -h
     """
+    
+    check_raw_arguments_for_non_ascii()
+    convert_hyphen_to_underscore_in_args()
+
     pre_parser = build_pre_parser()
     pre_args, remaining_args = pre_parser.parse_known_args()
 
@@ -286,9 +329,6 @@ def main():
             print(help_text)
         sys.exit(0)
 
-    # show repos alias list repo
-    if args.command in ("show"):
-        args.command = "list"
     if args.target == "repos":
         args.target = "repo"
         
