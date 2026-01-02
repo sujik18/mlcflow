@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 import inspect
 import shlex
+import unicodedata
 from . import utils
 
 from .action import Action, default_parent
@@ -43,7 +44,7 @@ class Automation:
             logger.info(f"No meta file found in {self.path}")
 
     def search(self, i):
-        indices = self.action_object.index.indices
+        indices = self.action_object.get_index().indices
         target_index = indices.get(self.automation_type)
         result = []
         if target_index:
@@ -154,7 +155,7 @@ def build_parser(pre_args):
     subparsers = parser.add_subparsers(dest="command", required=not pre_args.help)
 
     # General commands
-    for action in ['run', 'pull', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv', 'help']:
+    for action in ['run', 'pull', 'test', 'add', 'show', 'list', 'find', 'search', 'rm', 'cp', 'mv', 'help', 'prune']:
         p = subparsers.add_parser(action, add_help=False)
         p.add_argument('target', choices=['repo', 'repos', 'script', 'cache'])
         p.add_argument('details', nargs='?', help='Details or identifier (optional)')
@@ -176,6 +177,7 @@ def build_parser(pre_args):
 def configure_logging(args):
     if hasattr(args, 'extra') and args.extra:
         args.extra[:] = [log_flag_aliases.get(a, a) for a in args.extra]
+        
         for flag, level in log_levels.items():
             if flag in args.extra:
                 logger.setLevel(level)
@@ -190,7 +192,7 @@ def build_run_args(args):
 
     run_args = res['args_dict']
     if not mlc_run_cmd:
-        mlc_run_cmd = shlex.join(sys.argv)
+        mlc_run_cmd = shlex.join([os.path.basename(sys.argv[0]), *sys.argv[1:]])
     run_args['mlc_run_cmd'] = mlc_run_cmd
 
     if args.command in ['pull', 'rm', 'add', 'find'] and args.target == "repo":
@@ -218,6 +220,7 @@ def build_run_args(args):
 def is_quoted(arg):
     return (arg.startswith("'") and arg.endswith("'")) or \
            (arg.startswith('"') and arg.endswith('"'))
+
 
 def check_raw_arguments_for_non_ascii():
     bad_args = []

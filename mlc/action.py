@@ -165,6 +165,10 @@ class Action:
             logger.error(f"Error reading file: {e}")
             return None
     
+    def get_index(self):
+        if self._index is None:
+            self._index = Index(self.repos_path, self.repos)
+        return self._index
 
     def __init__(self):        
         setup_logging(log_path=os.getcwd(), log_file='.mlc-log.txt')
@@ -200,7 +204,7 @@ class Action:
 
         self.repos = self.load_repos_and_meta()
         #logger.info(f"In Action class: {self.repos_path}")
-        self.index = Index(self.repos_path, self.repos)
+        self._index = None
 
 
     def add(self, i):
@@ -380,7 +384,7 @@ class Action:
 
                 logger.info(f"{target_name} item: {item_path} has been successfully removed")
 
-            self.index.rm(item_meta, target_name, item_path)
+            self.get_index().rm(item_meta, target_name, item_path)
         
         return {
             "return": 0,
@@ -413,7 +417,7 @@ class Action:
         if save_result["return"] > 0:
             return save_result
    
-        self.index.add(item_meta, target_name, item_path, repo)
+        self.get_index().add(item_meta, target_name, item_path, repo)
         return {'return': 0}
 
     def update(self, i):
@@ -482,7 +486,7 @@ class Action:
             # Save the updated meta back to the item
             item.meta = meta
             save_result = utils.save_json(item_meta_path, meta=meta)
-            self.index.update(meta, target_name, item.path, item.repo)
+            self.get_index().update(meta, target_name, item.path, item.repo)
 
         return {'return': 0, 'message': f"Tags updated successfully for {len(found_items)} item(s).", 'list': found_items }
 
@@ -641,13 +645,13 @@ class Action:
         #Put the src uid to the destination path
         dest.meta['uid'] = src.meta['uid']
         dest._save_meta()
-        self.index.update(dest.meta, target_name, dest.path, dest.repo)
+        self.get_index().update(dest.meta, target_name, dest.path, dest.repo)
         logger.info(f"""Item with uid {dest.meta['uid']} successfully moved from {src.path} to {dest.path}""")
 
         return {'return': 0, 'src': src, 'dest': dest}
 
     def search(self, i):
-        indices = self.index.indices
+        indices = self.get_index().indices
         target = i.get('target_name', self.action_type)
         target_index = indices.get(target)
         result = []
