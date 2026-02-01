@@ -194,7 +194,7 @@ class Index:
                         self._remove_index_entry(automation_path)
                     
                     if delete_flag:
-                        self._save_indices()
+                        changed = True
                     continue
                 if current_item_keys is not None:
                     current_item_keys.add(config_path)
@@ -216,7 +216,7 @@ class Index:
         
         return changed
 
-    def build_index(self):
+    def build_index(self, force_rebuild=False):
         """
         Build shared indices for script, cache, and experiment folders across all repositories.
         
@@ -227,20 +227,22 @@ class Index:
         # track all currently detected item paths
         current_item_keys = set()
         changed = False
-        force_rebuild = False
 
         # load modified times
         self.modified_times = self._load_modified_times()
 
-        # if missing index file, then force full rebuild
-        index_json_path = os.path.join(self.repos_path, "index_script.json")
-        if not os.path.exists(index_json_path):
-            logger.warning("index_script.json missing. Forcing full index rebuild...")
+        # if any index file is missing, force full rebuild
+        missing_indices = []
+        for index_type, index_path in self.index_files.items():
+            if not os.path.exists(index_path):
+                missing_indices.append(index_type)
+        
+        if missing_indices:
+            logger.warning(f"Missing index files: {', '.join(missing_indices)}. Forcing full index rebuild...")
             self.modified_times = {}
             self.indices = {k: [] for k in self.index_files.keys()}
             force_rebuild = True
-           
-
+        
         # index each repo
         for repo in self.repos:
             repo_changed = self._index_single_repo(repo, force_rebuild, current_item_keys)
@@ -250,10 +252,10 @@ class Index:
         # remove deleted scripts
         deleted_keys = set(self.modified_times) - current_item_keys
         for key in deleted_keys:
-            logger.warning(f"Detected deleted item, removing entry from modified times: {key}")
-            del self.modified_times[key]
             folder_key = os.path.dirname(key)
-            #logger.warning(f"Removing index entry for folder: {folder_key}")
+            logger.warning(f"Detected deleted item: {key}")
+            logger.debug(f"Removing index entry for folder: {folder_key}")
+            del self.modified_times[key]
             self._remove_index_entry(folder_key)
             changed = True
         if deleted_keys:
@@ -265,14 +267,18 @@ class Index:
             self._save_indices()
 
     def _remove_index_entry(self, key):
-        logger.debug(f"Removing index entry for {key}")
+        logger.debug(f"Removing index entry for path: {key}")
         # Normalize paths for comparison
         normalized_key = os.path.normpath(key)
         for ft in self.indices:
+            original_count = len(self.indices[ft])
             self.indices[ft] = [
                 item for item in self.indices[ft]
                 if os.path.normpath(item["path"]) != normalized_key
             ]
+            removed_count = original_count - len(self.indices[ft])
+            if removed_count > 0:
+                logger.debug(f"Removed {removed_count} item(s) from {ft} index")
 
     def _delete_by_uid(self, folder_type, uid, alias):
         """
