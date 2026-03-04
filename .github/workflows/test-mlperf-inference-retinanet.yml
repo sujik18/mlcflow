@@ -1,0 +1,62 @@
+name: MLPerf inference retinanet
+
+on:
+  pull_request_target:
+    branches: [ "main", "dev" ]
+    paths:
+      - '.github/workflows/test-mlperf-inference-retinanet.yml'
+      - '**'
+      - '!**.md'
+
+jobs:
+          
+  mlc-run:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: [ "3.13" ]
+        backend: [ "onnxruntime", "pytorch" ]
+        implementation: [ "python", "cpp" ]
+        compiler-string: [ "", "--adr.compiler.tags=aocc --env.MLC_AOCC_ACCEPT_EULA=yes" ]
+        exclude:
+          - backend: pytorch
+            implementation: cpp
+          - os: windows-latest
+            implementation: cpp
+          - os: macos-latest
+            implementation: cpp
+          - implementation: python
+            compiler-string: "--adr.compiler.tags=aocc --env.MLC_AOCC_ACCEPT_EULA=yes"
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Configure git longpaths (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        git config --system core.longpaths true
+    - name: Install mlcflow
+      run: |
+        pip install mlcflow
+        pip install tabulate
+    - name: Pull MLOps repo
+      shell: bash
+      env:
+        REPO: ${{ github.event.pull_request.head.repo.html_url }}
+        BRANCH: ${{ github.event.pull_request.head.ref }}
+      run: |
+        mlc pull repo $REPO --branch=$BRANCH
+
+    - name: Test MLPerf Inference Retinanet using ${{ matrix.backend }} on ${{ matrix.os }}
+      if: matrix.os == 'windows-latest'
+      run: |
+        mlcr run,mlperf,inference,generate-run-cmds,_submission,_short --submitter="MLCommons" --pull_changes=yes --pull_inference_changes=yes --hw_name=gh_${{ matrix.os }} --model=retinanet --adr.loadgen.tags=_from-pip --pip_loadgen=yes --implementation=${{ matrix.implementation }} --backend=${{ matrix.backend }} --device=cpu --scenario=Offline --test_query_count=5 --quiet  -v --target_qps=1
+    - name: Test MLPerf Inference Retinanet using ${{ matrix.backend }} on ${{ matrix.os }}
+      if: matrix.os != 'windows-latest'
+      run: |
+        mlcr run,mlperf,inference,generate-run-cmds,_submission,_short --submitter="MLCommons" --pull_changes=yes --pull_inference_changes=yes --hw_name=gh_${{ matrix.os }}_x86 --model=retinanet --implementation=${{ matrix.implementation }} --backend=${{ matrix.backend }} --device=cpu --scenario=Offline --test_query_count=5  --quiet  -v --target_qps=1 ${{ matrix.compiler-string }}
