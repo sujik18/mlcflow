@@ -4,6 +4,7 @@ import json
 import yaml
 from .repo import Repo
 from datetime import datetime
+from filelock import FileLock
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -55,10 +56,14 @@ class Index:
         Load stored mtimes to check for changes in scripts.
         """
         if os.path.exists(self.modified_times_file):
+            output_file = self.modified_times_file
+            lock_file = output_file + ".lock"
             try:
-                # logger.info(f"Loading modified times from {self.modified_times_file}")
-                with open(self.modified_times_file, "r") as f:
-                    return json.load(f)
+                with FileLock(lock_file, timeout=30):
+                    logger.debug(f"Lock acquired at {lock_file} for loading modified times at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                    # logger.info(f"Loading modified times from {self.modified_times_file}")
+                    with open(self.modified_times_file, "r") as f:
+                        return json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"Failed to load modified times: {e}")
                 return {}
@@ -68,9 +73,16 @@ class Index:
         """
         Save updated mtimes in modified_times json file.
         """
-        #logger.debug(f"Saving modified times to {self.modified_times_file}")
-        with open(self.modified_times_file, "w") as f:
-            json.dump(self.modified_times, f, indent=4)
+        output_file = self.modified_times_file
+        lock_file = output_file + ".lock"
+        try:
+            with FileLock(lock_file, timeout=30):
+                logger.debug(f"Lock acquired at {lock_file} for saving modified times at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                #logger.debug(f"Saving modified times to {self.modified_times_file}")
+                with open(self.modified_times_file, "w") as f:
+                    json.dump(self.modified_times, f, indent=4)
+        except Exception as e:
+            logger.error(f"Error saving modified times: {e}")
 
     def _load_existing_index(self):
         """
@@ -78,14 +90,18 @@ class Index:
         """
         for folder_type, file_path in self.index_files.items():
             if os.path.exists(file_path):
+                output_file = file_path
+                lock_file = output_file + ".lock"
                 try:
-                    # logger.info(f"Loading existing index for {folder_type}")
-                    with open(file_path, "r") as f:
-                        self.indices[folder_type] = json.load(f)
-                    # Convert repo dicts back into Repo objects
-                    for item in self.indices[folder_type]:
-                        if isinstance(item.get("repo"), dict):
-                            item["repo"] = Repo(**item["repo"])
+                    with FileLock(lock_file, timeout=30):
+                        logger.debug(f"Lock acquired at {lock_file} for loading existing index for {folder_type} time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                        # logger.info(f"Loading existing index for {folder_type}")
+                        with open(file_path, "r") as f:
+                            self.indices[folder_type] = json.load(f)
+                        # Convert repo dicts back into Repo objects
+                        for item in self.indices[folder_type]:
+                            if isinstance(item.get("repo"), dict):
+                                item["repo"] = Repo(**item["repo"])
 
                 except (json.JSONDecodeError, IOError, KeyError, TypeError) as e:
                     logger.warning(f"Failed to load index for {folder_type}: {e}")
@@ -353,10 +369,13 @@ class Index:
         #logger.info(self.indices)
         for folder_type, index_data in self.indices.items():
             output_file = self.index_files[folder_type]
+            lock_file = output_file + ".lock"
             try:
-                with open(output_file, "w") as f:
-                    json.dump(index_data, f, indent=4, cls=CustomJSONEncoder)
-                #logger.debug(f"Shared index for {folder_type} saved to {output_file}.")
+                with FileLock(lock_file, timeout=30):
+                    logger.debug(f"Lock acquired at {lock_file} for saving index for {folder_type} time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                    with open(output_file, "w") as f:
+                        json.dump(index_data, f, indent=4, cls=CustomJSONEncoder)
+                    #logger.debug(f"Shared index for {folder_type} saved to {output_file}.")
             except Exception as e:
                 logger.error(f"Error saving shared index for {folder_type}: {e}")
 
