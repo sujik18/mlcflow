@@ -4,6 +4,8 @@ import json
 import yaml
 from .repo import Repo
 from datetime import datetime
+from contextlib import contextmanager
+from filelock import FileLock, Timeout
 
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -54,42 +56,91 @@ class Index:
         """
         Load stored mtimes to check for changes in scripts.
         """
-        if os.path.exists(self.modified_times_file):
-            try:
-                # logger.info(f"Loading modified times from {self.modified_times_file}")
-                with open(self.modified_times_file, "r") as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
-                logger.warning(f"Failed to load modified times: {e}")
-                return {}
-        return {}
+        lock_file = self.modified_times_file + ".lock"
+        try:
+            with self._file_lock_with_incremental_timeout(lock_file):
+                # logger.debug(f"Lock acquired at {lock_file} for Loading Modified Times")
+
+                if os.path.exists(self.modified_times_file):
+                    # logger.info(f"Loading modified times from {self.modified_times_file}")
+                    with open(self.modified_times_file, "r") as f:
+                        return json.load(f)
+                else:
+                    return {}
+                
+        except Timeout:
+            logger.warning(f"Timeout acquiring lock {lock_file}")
+            return {}
+
+        except Exception as e:
+            logger.error(f"Error acquiring lock {lock_file}: {e}")
+            return {}
+
+    @contextmanager
+    def _file_lock_with_incremental_timeout(self, lock_file, timeout_seconds=60):
+        """
+        Acquire a file lock by waiting up to a minute, then retrying once if it times out.
+        """
+        try:
+            with FileLock(lock_file, timeout=timeout_seconds):
+                yield # Control goes to the caller's 'with' block while the file lock is held
+                return
+        except Timeout:
+            logger.warning(
+                f"Timeout acquiring lock {lock_file} after {int(timeout_seconds)}s. "
+                f"Retrying once for another {int(timeout_seconds)}s..."
+            )
+
+        with FileLock(lock_file, timeout=timeout_seconds):
+            yield
 
     def _save_modified_times(self):
         """
         Save updated mtimes in modified_times json file.
         """
-        #logger.debug(f"Saving modified times to {self.modified_times_file}")
-        with open(self.modified_times_file, "w") as f:
-            json.dump(self.modified_times, f, indent=4)
+        lock_file = self.modified_times_file + ".lock"
+        try:
+            with self._file_lock_with_incremental_timeout(lock_file):
+                # logger.debug(f"Lock acquired at {lock_file} for Saving Modified Times")
+
+                #logger.debug(f"Saving modified times to {self.modified_times_file}")
+                with open(self.modified_times_file, "w") as f:
+                    json.dump(self.modified_times, f, indent=4)
+        
+        except Timeout:
+            logger.warning(f"Timeout acquiring lock {lock_file}, skipping modified times save")
+
+        except Exception as e:
+            logger.error(f"Error saving modified times: {e}")
 
     def _load_existing_index(self):
         """
         Load previously saved index to allow incremental updates.
         """
         for folder_type, file_path in self.index_files.items():
-            if os.path.exists(file_path):
-                try:
-                    # logger.info(f"Loading existing index for {folder_type}")
-                    with open(file_path, "r") as f:
-                        self.indices[folder_type] = json.load(f)
-                    # Convert repo dicts back into Repo objects
-                    for item in self.indices[folder_type]:
-                        if isinstance(item.get("repo"), dict):
-                            item["repo"] = Repo(**item["repo"])
+            lock_file = file_path + ".lock"
+            try:
+                with self._file_lock_with_incremental_timeout(lock_file):
+                    # logger.debug(f"Lock acquired at {lock_file} for Loading Index for {folder_type}")
 
-                except (json.JSONDecodeError, IOError, KeyError, TypeError) as e:
-                    logger.warning(f"Failed to load index for {folder_type}: {e}")
-                    pass   # fall back to empty index
+                    if os.path.exists(file_path):
+                        # logger.info(f"Loading existing index for {folder_type}")
+                        with open(file_path, "r") as f:
+                            self.indices[folder_type] = json.load(f)
+                        # Convert repo dicts back into Repo objects
+                        for item in self.indices[folder_type]:
+                            if isinstance(item.get("repo"), dict):
+                                item["repo"] = Repo(**item["repo"])
+                    else:
+                        self.indices[folder_type] = []
+            
+            except Timeout:
+                logger.error(f"Timeout acquiring lock {lock_file}")
+                self.indices[folder_type] = []
+
+            except (json.JSONDecodeError, IOError, KeyError, TypeError) as e:
+                logger.warning(f"Failed to load index for {folder_type}: {e}")
+                self.indices[folder_type] = []   # fall back to empty index
 
     def add(self, meta, folder_type, path, repo):
         if not repo:
@@ -353,10 +404,18 @@ class Index:
         #logger.info(self.indices)
         for folder_type, index_data in self.indices.items():
             output_file = self.index_files[folder_type]
+            lock_file = output_file + ".lock"
             try:
-                with open(output_file, "w") as f:
-                    json.dump(index_data, f, indent=4, cls=CustomJSONEncoder)
-                #logger.debug(f"Shared index for {folder_type} saved to {output_file}.")
+                with self._file_lock_with_incremental_timeout(lock_file):
+                    #logger.debug(f"Lock acquired at {lock_file} for Saving Index for {folder_type}")
+
+                    with open(output_file, "w") as f:
+                        json.dump(index_data, f, indent=4, cls=CustomJSONEncoder)
+                    #logger.debug(f"Shared index for {folder_type} saved to {output_file}.")
+            
+            except Timeout:
+                logger.error(f"Timeout acquiring lock {lock_file}")
+
             except Exception as e:
                 logger.error(f"Error saving shared index for {folder_type}: {e}")
 
