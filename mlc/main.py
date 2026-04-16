@@ -80,6 +80,7 @@ class Automation:
 mlc_run_cmd = None
 _current_target = None
 
+
 def get_version_info():
     """Return mlcflow version string with commit hash."""
     try:
@@ -92,6 +93,7 @@ def get_version_info():
         return f"mlcflow {version('mlcflow')}"
     except Exception:
         return "mlcflow (unknown version)"
+
 
 def _get_repo_hashes():
     """Get git info for all repos. Returns list of (alias, branch, hash, has_local_changes)."""
@@ -122,6 +124,7 @@ def _get_repo_hashes():
         except Exception:
             pass
     return results
+
 
 def _report_error(e):
     import traceback
@@ -184,8 +187,10 @@ def _report_error(e):
         # Derive issues URL from repo alias
         issues_url = 'https://github.com/mlcommons/mlperf-automations/issues'
         if repo_alias and '@' in repo_alias:
-            issues_url = 'https://github.com/' + repo_alias.replace('@', '/') + '/issues'
-        logger.error(f"Please file an issue at {issues_url} with the full console log.")
+            issues_url = 'https://github.com/' + \
+                repo_alias.replace('@', '/') + '/issues'
+        logger.error(
+            f"Please file an issue at {issues_url} with the full console log.")
 
     # Show version and repo commit hashes for debugging
     logger.error(f"{get_version_info()}")
@@ -256,12 +261,15 @@ def process_console_output(res, target, action, run_args):
         if len(res['list']) == 0:
             # Only show warning if not in path-only mode
             if not run_args.get('path_only'):
-                logger.warning(f"""No {target} entry found for the specified input: {run_args}!""")
-                logger.info("Tip: Run 'mlc pull repo' to fetch the latest upstream changes.")
+                logger.warning(
+                    f"""No {target} entry found for the specified input: {run_args}!""")
+                logger.info(
+                    "Tip: Run 'mlc pull repo' to fetch the latest upstream changes.")
                 repo_hashes = _get_repo_hashes()
                 for alias, branch, commit, dirty in repo_hashes:
                     if dirty:
-                        logger.warning(f"Repo '{alias}' ({branch}) has local changes - 'mlc pull repo' may fail. Commit or stash changes first.")
+                        logger.warning(
+                            f"Repo '{alias}' ({branch}) has local changes - 'mlc pull repo' may fail. Commit or stash changes first.")
         else:
             for item in res['list']:
                 if run_args.get('path_only'):
@@ -530,7 +538,8 @@ def main():
     if pre_args.help and not "tags" in run_args:
         help_text = ""
         if pre_args.target == "run":
-            if pre_args.action.startswith("docker") or pre_args.action == "apptainer":
+            if pre_args.action.startswith(
+                    "docker") or pre_args.action == "apptainer":
                 pre_args.target = "script"
             else:
                 logger.error(
@@ -581,10 +590,9 @@ def main():
     if not hasattr(args, 'command'):
         logging.error("Error: No command specified.")
         sys.exit(1)
-        
+
     global _current_target
     _current_target = args.target
-
 
     action = get_action(args.target, default_parent)
 

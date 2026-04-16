@@ -9,6 +9,7 @@ from .index import Index
 from . import utils
 from .logger import logger
 
+
 class ScriptAction(Action):
     """
     ####################################################################################################################
@@ -36,6 +37,7 @@ class ScriptAction(Action):
 
     """
     parent = None
+
     def __init__(self, parent=None):
         self.parent = parent
         self.__dict__.update(vars(parent))
@@ -60,7 +62,7 @@ class ScriptAction(Action):
         return res
 
     find = search
-        
+
     def rm(self, i):
         """
     ####################################################################################################################
@@ -68,7 +70,7 @@ class ScriptAction(Action):
     Action: Remove(rm)
     ####################################################################################################################
 
-    The `remove` (`rm`) action deletes one or more scripts from MLC repositories.  
+    The `remove` (`rm`) action deletes one or more scripts from MLC repositories.
 
     Example Command:
 
@@ -87,14 +89,14 @@ class ScriptAction(Action):
     Action: Show
     ####################################################################################################################
 
-    The `show` action retrieves the path and metadata of the searched script in MLC repositories.  
+    The `show` action retrieves the path and metadata of the searched script in MLC repositories.
 
     Example Command:
 
     mlc show script --tags=detect,os
 
     Example Output:
-          
+
       arjun@intel-spr-i9:~$ mlc show script --tags=detect,os
       [2025-02-14 02:56:16,604 main.py:1404 INFO] - Showing script with tags: detect,os
       Location: /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/detect-os:
@@ -103,7 +105,7 @@ class ScriptAction(Action):
         alias: detect-os
         description: Detects the operating system and platform information
         tags: ['detect-os', 'detect', 'os', 'info']
-        new_env_keys: ['MLC_HOST_OS_*', '+MLC_HOST_OS_*', 'MLC_HOST_PLATFORM_*', 'MLC_HOST_PYTHON_*', 'MLC_HOST_SYSTEM_NAME', 
+        new_env_keys: ['MLC_HOST_OS_*', '+MLC_HOST_OS_*', 'MLC_HOST_PLATFORM_*', 'MLC_HOST_PYTHON_*', 'MLC_HOST_SYSTEM_NAME',
                        'MLC_RUN_STATE_DOCKER', '+PATH']
         new_state_keys: ['os_uname_*']
       ......................................................
@@ -118,7 +120,14 @@ class ScriptAction(Action):
         if res['return'] > 0:
             return res
         logger.info(f"Showing script with tags: {run_args.get('tags')}")
-        script_meta_keys_to_show = ["uid", "alias", "description", "tags", "new_env_keys", "new_state_keys", "cache"]
+        script_meta_keys_to_show = [
+            "uid",
+            "alias",
+            "description",
+            "tags",
+            "new_env_keys",
+            "new_state_keys",
+            "cache"]
         for item in res['list']:
             print(f"""Location: {item.path}:
 Main Script Meta:""")
@@ -129,9 +138,10 @@ Main Script Meta:""")
                 print("    Input mapping:")
                 utils.printd(item.meta["input_mapping"], begin_spaces=8)
             print("......................................................")
-            print(f"""For full script meta, see meta file at {os.path.join(item.path, "meta.yaml")}""")
+            print(
+                f"""For full script meta, see meta file at {os.path.join(item.path, "meta.yaml")}""")
             print("")
-            
+
         return {'return': 0}
 
     def add(self, i):
@@ -141,17 +151,17 @@ Main Script Meta:""")
     Action: Add
     ####################################################################################################################
 
-    The `add` action creates a new script in a registered MLC repository.  
+    The `add` action creates a new script in a registered MLC repository.
 
     Syntax:
 
     mlc add script <user@repo>:new_script --tags=benchmark
 
     Options:
-        --template_tags: A comma-separated list of tags to create a new MLC script based on existing templates.  
+        --template_tags: A comma-separated list of tags to create a new MLC script based on existing templates.
 
     Example Output:
-          
+
       arjun@intel-spr-i9:~$ mlc add script gateoverflow@mlperf-automations --tags=benchmark --template_tags=app,mlperf,inference
       More than one script found for None:
       1. /home/arjun/MLC/repos/gateoverflow@mlperf-automations/script/app-mlperf-inference-mlcommons-python
@@ -189,7 +199,7 @@ Main Script Meta:""")
         ii['src_tags'] = i.get("template_tags", "template,generic")
         ii['dest'] = item
         ii['tags'] = i.get('tags', [])
-        res =  self.cp(ii)
+        res = self.cp(ii)
 
         return res
 
@@ -209,7 +219,8 @@ Main Script Meta:""")
         module_name = os.path.splitext(os.path.basename(script_path))[0]
         spec = importlib.util.spec_from_file_location(module_name, script_path)
         if spec is None or spec.loader is None:
-            raise ImportError(f"Cannot create a module spec for: {script_path}")
+            raise ImportError(
+                f"Cannot create a module spec for: {script_path}")
 
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -220,11 +231,12 @@ Main Script Meta:""")
         self.action_type = "script"
         repos_folder = self.repos_path
 
-        # Import script submodule 
+        # Import script submodule
         script_path = self.find_target_folder("script")
         if not script_path:
-            logger.warning("Script automation not found. Automatically pulling mlcommons@mlperf-automations repository...")
-            
+            logger.warning(
+                "Script automation not found. Automatically pulling mlcommons@mlperf-automations repository...")
+
             # Use the access method to pull the required repository
             result = self.access({
                 "automation": "repo",
@@ -240,11 +252,15 @@ Main Script Meta:""")
                 # Try to find the script path again after pulling
                 script_path = self.find_target_folder("script")
                 if not script_path:
-                    return {'return': 1, 'error': f"""Script automation still not found after pulling mlcommons@mlperf-automations --branch=dev."""}
+                    return {
+                        'return': 1, 'error': f"""Script automation still not found after pulling mlcommons@mlperf-automations --branch=dev."""}
             else:
-                # If pull failed, return the original error with additional info
-                logger.error(f"Failed to pull mlcommons@mlperf-automations repository: {result.get('error', 'Unknown error')}")
-                return {'return': 1, 'error': f"""Script automation not found and failed to automatically pull mlcommons@mlperf-automations --branch=dev. Please run "mlc pull repo mlcommons@mlperf-automations --branch=dev" manually: {result.get('error', 'Unknown error')}"""}
+                # If pull failed, return the original error with additional
+                # info
+                logger.error(
+                    f"Failed to pull mlcommons@mlperf-automations repository: {result.get('error', 'Unknown error')}")
+                return {
+                    'return': 1, 'error': f"""Script automation not found and failed to automatically pull mlcommons@mlperf-automations --branch=dev. Please run "mlc pull repo mlcommons@mlperf-automations --branch=dev" manually: {result.get('error', 'Unknown error')}"""}
 
         module_path = os.path.join(script_path, "module.py")
         module = self.dynamic_import_module(module_path)
@@ -255,29 +271,40 @@ Main Script Meta:""")
             params = inspect.signature(ctor).parameters
 
             if 'run_args' in params:
-                automation_instance = module.ScriptAutomation(self, module_path, run_args)
+                automation_instance = module.ScriptAutomation(
+                    self, module_path, run_args)
             else:
-                automation_instance = module.ScriptAutomation(self, module_path)
+                automation_instance = module.ScriptAutomation(
+                    self, module_path)
 
             try:
                 if function_name == "run":
-                    result = automation_instance.run(run_args)  # Pass args to the run method
+                    result = automation_instance.run(
+                        run_args)  # Pass args to the run method
                 elif function_name == "docker":
-                    result = automation_instance.docker(run_args)  # Pass args to the run method
+                    result = automation_instance.docker(
+                        run_args)  # Pass args to the run method
                 elif function_name == "test":
-                    result = automation_instance.test(run_args)  # Pass args to the run method
+                    result = automation_instance.test(
+                        run_args)  # Pass args to the run method
                 elif function_name == "experiment":
-                    result = automation_instance.experiment(run_args)  # Pass args to the experiment method
+                    result = automation_instance.experiment(
+                        run_args)  # Pass args to the experiment method
                 elif function_name == "remote_run":
-                    result = automation_instance.remote_run(run_args)  # Pass args to the experiment method
+                    result = automation_instance.remote_run(
+                        run_args)  # Pass args to the experiment method
                 elif function_name == "help":
-                    result = automation_instance.help(run_args)  # Pass args to the help method
+                    result = automation_instance.help(
+                        run_args)  # Pass args to the help method
                 elif function_name == "doc":
-                    result = automation_instance.doc(run_args)  # Pass args to the doc method
+                    result = automation_instance.doc(
+                        run_args)  # Pass args to the doc method
                 elif function_name == "lint":
-                    result = automation_instance.lint(run_args)  # Pass args to the lint method
+                    result = automation_instance.lint(
+                        run_args)  # Pass args to the lint method
                 else:
-                    return {'return': 1, 'error': f'Function {function_name} is not supported'}
+                    return {
+                        'return': 1, 'error': f'Function {function_name} is not supported'}
             except ScriptExecutionError:
                 raise
             except Exception as exc:
@@ -285,21 +312,24 @@ Main Script Meta:""")
                 _repo_alias = _repo_match.group(1) if _repo_match else None
                 _script_name = run_args.get('tags', run_args.get('details'))
                 raise ScriptExecutionError(
-                    f"Script {function_name} execution failed in {module_path}." + "\nError : " + f"{type(exc).__name__}: {exc}",
+                    f"Script {function_name} execution failed in {module_path}." +
+                    "\nError : " + f"{type(exc).__name__}: {exc}",
                     script_name=_script_name, repo_alias=_repo_alias, module_path=module_path,
                     run_args=run_args) from exc
-            
+
             if result['return'] > 0:
                 error = result.get('error', "")
                 _name_match = re.search(r'name\s*=\s*([^,)]+)', error)
-                _script_name = _name_match.group(1).strip() if _name_match else run_args.get('tags', run_args.get('details'))
+                _script_name = _name_match.group(1).strip() if _name_match else run_args.get(
+                    'tags', run_args.get('details'))
                 _repo_match = re.search(r'/repos/([^/]+)/', module_path)
                 _repo_alias = _repo_match.group(1) if _repo_match else None
                 # Dump dependency version info to file for debugging
                 _version_info_file = None
                 _version_info = result.get('version_info', [])
                 if _version_info:
-                    _version_info_file = os.path.join(os.getcwd(), 'mlc-error-version-info.json')
+                    _version_info_file = os.path.join(
+                        os.getcwd(), 'mlc-error-version-info.json')
                     try:
                         with open(_version_info_file, 'w') as _vf:
                             json.dump(_version_info, _vf, indent=2)
@@ -310,18 +340,20 @@ Main Script Meta:""")
                     script_name=_script_name, repo_alias=_repo_alias, module_path=module_path,
                     run_args=run_args, version_info_file=_version_info_file)
 
-            if str(run_args.get("mlc_output")).lower() in ["on", "true", "yes", "1"]:
+            if str(run_args.get("mlc_output")).lower() in [
+                    "on", "true", "yes", "1"]:
                 with open("tmp-state.json", "w") as f:
                     json.dump(result['new_state'], f, indent=2)
 
                 with open("tmp-run-env.out", "w") as f:
-                    for key,val in result['new_env'].items():
+                    for key, val in result['new_env'].items():
                         f.write(f"""{key}="{val}"\n""")
 
             return result
         else:
             logger.info("ScriptAutomation class not found in the script.")
-            return {'return': 1, 'error': 'ScriptAutomation class not found in the script.'}
+            return {'return': 1,
+                    'error': 'ScriptAutomation class not found in the script.'}
 
     def docker(self, run_args):
         return self.docker_run(run_args)
@@ -333,13 +365,13 @@ Main Script Meta:""")
     Action: Docker
     ####################################################################################################################
 
-    The `docker` action runs scripts inside a containerized environment.  
+    The `docker` action runs scripts inside a containerized environment.
 
     An MLCFlow script can be executed inside a Docker container using either of the following syntaxes:
 
-    1. Docker Run: mlc docker run --tags=<script tags> <run flags> (e.g., mlc docker run --tags=detect,os --docker_dt 
+    1. Docker Run: mlc docker run --tags=<script tags> <run flags> (e.g., mlc docker run --tags=detect,os --docker_dt
                        --docker_cache=no)
-    2. Docker Script: mlc docker script --tags=<script tags> <run flags> (e.g., mlc docker script --tags=detect,os 
+    2. Docker Script: mlc docker script --tags=<script tags> <run flags> (e.g., mlc docker script --tags=detect,os
                           --docker_dt --docker_cache=no)
 
     Flags Available:
@@ -371,7 +403,7 @@ Main Script Meta:""")
     Action: remote-run
     ####################################################################################################################
 
-    The `remote-run` action runs a shell command on a remote machine via ssh connection.  
+    The `remote-run` action runs a shell command on a remote machine via ssh connection.
 
 
     Flags Available:
@@ -388,7 +420,6 @@ Main Script Meta:""")
         """
         return self.call_script_module_function("remote_run", run_args)
 
-
     def run(self, run_args):
         """
     ####################################################################################################################
@@ -396,7 +427,7 @@ Main Script Meta:""")
     Action: Run
     ####################################################################################################################
 
-    The `run` action executes a script from an MLC repository.  
+    The `run` action executes a script from an MLC repository.
 
     Example Command:
 
@@ -407,13 +438,12 @@ Main Script Meta:""")
 
     1. -j: Displays the output in JSON format.
     2. Instead of using `mlc run script --tags=`, you can simply use `mlcr`.
-    3. *<Individual script inputs>: The `mlcr` command can accept additional inputs defined in the script's `input_mappings` metadata.  
+    3. *<Individual script inputs>: The `mlcr` command can accept additional inputs defined in the script's `input_mappings` metadata.
 
         """
         if not run_args.get('tags') and not run_args.get('details'):
             return self.call_script_module_function("help", run_args)
         return self.call_script_module_function("run", run_args)
-
 
     def test(self, run_args):
         """
@@ -422,7 +452,7 @@ Main Script Meta:""")
     Action: test
     ####################################################################################################################
 
-    The `test` action validates scripts that are configured with a `tests` section in `meta.yaml`.  
+    The `test` action validates scripts that are configured with a `tests` section in `meta.yaml`.
 
     Example Command:
 
@@ -431,7 +461,6 @@ Main Script Meta:""")
         """
         return self.call_script_module_function("test", run_args)
 
-
     def doc(self, run_args):
         """
     ####################################################################################################################
@@ -439,7 +468,7 @@ Main Script Meta:""")
     Action: doc
     ####################################################################################################################
 
-    The `doc` action creates automatic README for scripts from the contents in `meta.yaml`.  
+    The `doc` action creates automatic README for scripts from the contents in `meta.yaml`.
 
     Example Command:
 
@@ -455,7 +484,7 @@ Main Script Meta:""")
     Action: lint
     ####################################################################################################################
 
-    The `lint` action automatically formats the contents in `meta.yaml`.  
+    The `lint` action automatically formats the contents in `meta.yaml`.
 
     Example Command:
 
@@ -464,11 +493,10 @@ Main Script Meta:""")
         """
         return self.call_script_module_function("lint", run_args)
 
-
     def help(self, run_args):
-        # Internal function to call the help function in script automation module.py
+        # Internal function to call the help function in script automation
+        # module.py
         return self.call_script_module_function("help", run_args)
-
 
     def list(self, args):
         """
@@ -477,7 +505,7 @@ Main Script Meta:""")
     Action: List
     ####################################################################################################################
 
-    The `list` action displays all scripts and their paths from repositories registered in MLC.  
+    The `list` action displays all scripts and their paths from repositories registered in MLC.
 
     Example Command:
 
@@ -485,16 +513,20 @@ Main Script Meta:""")
 
         """
         self.action_type = "script"
-        run_args = {"fetch_all": True}  # to fetch the details of all the scripts present in repos registered  in mlc
-        
+        # to fetch the details of all the scripts present in repos registered
+        # in mlc
+        run_args = {"fetch_all": True}
+
         res = self.search(run_args)
         if res['return'] > 0:
             return res
-        
-        logger.info(f"Listing all the scripts and their paths present in repos which are registered in MLC")
+
+        logger.info(
+            f"Listing all the scripts and their paths present in repos which are registered in MLC")
         print("......................................................")
         for item in res['list']:
-            print(f"alias: {item.meta['alias'] if item.meta.get('alias') else 'None'}")
+            print(
+                f"alias: {item.meta['alias'] if item.meta.get('alias') else 'None'}")
             print(f"Location: {item.path}")
             print("......................................................")
 
@@ -517,8 +549,10 @@ Main Script Meta:""")
         """
         return self.call_script_module_function("experiment", run_args)
 
+
 class ScriptExecutionError(Exception):
-    def __init__(self, message, script_name=None, repo_alias=None, module_path=None, run_args=None, version_info_file=None):
+    def __init__(self, message, script_name=None, repo_alias=None,
+                 module_path=None, run_args=None, version_info_file=None):
         super().__init__(message)
         self.script_name = script_name
         self.repo_alias = repo_alias

@@ -1,5 +1,7 @@
+from .action import access
 import os
 import subprocess
+
 
 def _get_version():
     """Read version from VERSION file or package metadata, and append git commit hash if available."""
@@ -8,7 +10,8 @@ def _get_version():
 
     # Read VERSION file (works in dev/source tree)
     version = None
-    for vpath in [os.path.join(root_dir, "VERSION"), os.path.join(pkg_dir, "VERSION")]:
+    for vpath in [os.path.join(root_dir, "VERSION"),
+                  os.path.join(pkg_dir, "VERSION")]:
         if os.path.isfile(vpath):
             with open(vpath) as f:
                 version = f.read().strip()
@@ -35,8 +38,8 @@ def _get_version():
 
     return version
 
+
 __version__ = _get_version()
 
-from .action import access
 
 __all__ = ['access']
