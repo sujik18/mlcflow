@@ -604,9 +604,6 @@ def main():
     global _current_target
     _current_target = args.target
 
-    global _current_target
-    _current_target = args.target
-
     action = get_action(args.target, default_parent)
 
     if not action or not hasattr(action, args.command):
