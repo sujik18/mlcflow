@@ -549,6 +549,56 @@ Main Script Meta:""")
         """
         return self.call_script_module_function("experiment", run_args)
 
+    def remote_experiment(self, run_args):
+        """
+    ################################################################################################################################################
+    Target: Script
+    Action: remote-experiment
+    ################################################################################################################################################
+
+    The `remote-experiment` action runs an experiment on a remote machine via ssh connection.
+
+    Flags Available:
+
+    1. --remote_host:
+        IP or hostname for the remote machine
+    2. --remote_port:
+        ssh port for the remote machine
+
+    Example Command:
+
+    mlc remote-experiment script --tags=detect,os -j
+    mlcre detect,os -j
+
+        """
+        run_args["remote_action"] = "experiment"
+        return self.call_script_module_function("remote_run", run_args)
+
+    def remote_docker(self, run_args):
+        """
+    ################################################################################################################################################
+    Target: Script
+    Action: remote-docker
+    ################################################################################################################################################
+
+    The `remote-docker` action runs a script inside a Docker container on a remote machine via ssh connection.
+
+    Flags Available:
+
+    1. --remote_host:
+        IP or hostname for the remote machine
+    2. --remote_port:
+        ssh port for the remote machine
+
+    Example Command:
+
+    mlc remote-docker script --tags=detect,os -j
+    mlcrd detect,os -j
+
+        """
+        run_args["remote_action"] = "docker"
+        return self.call_script_module_function("remote_run", run_args)
+
 
 class ScriptExecutionError(Exception):
     def __init__(self, message, script_name=None, repo_alias=None,
