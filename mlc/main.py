@@ -229,8 +229,8 @@ def mlcd():
     mlc_expand_short("docker")
 
 
-def mlcdr():
-    mlc_expand_short("docker")
+def mlca():
+    mlc_expand_short("apptainer")
 
 
 def mlca():
@@ -239,6 +239,14 @@ def mlca():
 
 def mlcrr():
     mlc_expand_short("remote-run")
+
+
+def mlcre():
+    mlc_expand_short("remote-experiment")
+
+
+def mlcrd():
+    mlc_expand_short("remote-docker")
 
 
 def mlce():
@@ -374,7 +382,8 @@ def build_parser(pre_args):
 
     # Script-only
     for action in ['docker', 'docker-run', 'apptainer',
-                   'experiment', 'remote-run', 'doc', 'lint']:
+                   'experiment', 'remote-run', 'remote-experiment',
+                   'remote-docker', 'doc', 'lint']:
         p = subparsers.add_parser(action, add_help=False)
         p.add_argument('target', choices=['script', 'run'])
         p.add_argument(
@@ -415,7 +424,8 @@ def build_run_args(args):
         run_args['repo'] = args.details
 
     if args.command in ['docker', 'docker-run', 'apptainer', 'experiment',
-                        'remote-run', 'doc', 'lint'] and args.target == "run":
+                        'remote-run', 'remote-experiment',
+                        'remote-docker', 'doc', 'lint'] and args.target == "run":
         # run_args['target'] = 'script' #dont modify this as script might have
         # target as in input
         args.target = "script"
@@ -590,6 +600,9 @@ def main():
     if not hasattr(args, 'command'):
         logging.error("Error: No command specified.")
         sys.exit(1)
+
+    global _current_target
+    _current_target = args.target
 
     global _current_target
     _current_target = args.target
