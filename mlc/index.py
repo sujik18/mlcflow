@@ -261,17 +261,6 @@ class Index:
                     if delete_flag:
                         changed = True
                     continue
-
-                # Validate script meta against schema during indexing
-                if folder_type == "script":
-                    errors, warnings = validate_meta(data, config_path)
-                    for e in errors:
-                        logger.error(f"Meta validation error: {e}")
-                    for w in warnings:
-                        logger.debug(f"Meta validation warning: {w}")
-                    if errors:
-                        raise ValueError(
-                            f"Meta validation failed for {config_path}. Fix the above error(s) and try again.")
                 
                 if current_item_keys is not None:
                     current_item_keys.add(config_path)
@@ -282,14 +271,25 @@ class Index:
                 if old_mtime == mtime and not repos_changed:
                     continue
 
+                # Validate script meta against schema during indexing if meta changed or repos changed
+                if folder_type == "script":
+                    # logger.debug(f"-----Meta changed for {automation_path}, validating against schema... -----")
+                    errors, warnings = validate_meta(data, config_path)
+                    for e in errors:
+                        logger.error(f"Meta validation error: {e}")
+                    for w in warnings:
+                        logger.debug(f"Meta validation warning: {w}")
+                    if errors:
+                        raise ValueError(
+                            f"Meta validation failed for {config_path}. Fix the above error(s) and try again.")
+                
                 self.modified_times[config_path] = {
                     "mtime": mtime,
                     "date_time": datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
                 }
 
                 # meta file changed, so reindex
-                self._process_config_file(
-                    config_path, folder_type, automation_path, repo)
+                self._process_config_file(config_path, folder_type, automation_path, repo)
                 changed = True
 
         return changed
