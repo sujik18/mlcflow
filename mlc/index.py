@@ -232,8 +232,12 @@ class Index:
 
                 if os.path.isfile(yaml_path):
                     config_path = yaml_path
+                    with open(config_path, "r") as f:
+                        data = yaml.safe_load(f) or {}
                 elif os.path.isfile(json_path):
                     config_path = json_path
+                    with open(config_path, "r") as f:
+                        data = json.load(f) or {}
                 else:
                     # No config file found, remove from index if exists
                     delete_flag = False
@@ -257,6 +261,18 @@ class Index:
                     if delete_flag:
                         changed = True
                     continue
+
+                # Validate script meta against schema during indexing
+                if folder_type == "script":
+                    errors, warnings = validate_meta(data, config_path)
+                    for e in errors:
+                        logger.error(f"Meta validation error: {e}")
+                    for w in warnings:
+                        logger.debug(f"Meta validation warning: {w}")
+                    if errors:
+                        raise ValueError(
+                            f"Meta validation failed for {config_path}. Fix the above error(s) and try again.")
+                
                 if current_item_keys is not None:
                     current_item_keys.add(config_path)
                 mtime = self.get_item_mtime(config_path)
@@ -346,7 +362,7 @@ class Index:
             if removed_count > 0:
                 logger.debug(
                     f"Removed {removed_count} item(s) from {ft} index")
-
+    
     def _delete_index_entries(self, folder_type, key, value):
         """
         Remove index entries matching for the same path or same UID.
@@ -400,22 +416,10 @@ class Index:
             tags = data.get("tags", [])
             alias = data.get("alias", None)
 
-            # Validate script meta against schema during indexing
-            if folder_type == "script":
-                errors, warnings = validate_meta(data, config_file)
-                for e in errors:
-                    logger.error(f"Meta validation error: {e}")
-                for w in warnings:
-                    logger.debug(f"Meta validation warning: {w}")
-                if errors:
-                    raise ValueError(
-                        f"Meta validation failed for {config_file}. Fix the above error(s) and try again.")
-
             # Remove stale entry for the same meta file path if exists
             self._delete_index_entries(folder_type, "path", folder_path)
 
-            # Remove index entry with the same UID for other meta file if
-            # exists
+            # Remove index entry with the same UID for other meta file if exists
             self._delete_index_entries(folder_type, "uid", unique_id)
 
             self.indices[folder_type].append({
