@@ -78,6 +78,127 @@ class Automation:
 
 
 mlc_run_cmd = None
+_current_target = None
+
+
+def get_version_info():
+    """Return mlcflow version string with commit hash."""
+    try:
+        from . import __version__
+        return f"mlcflow {__version__}"
+    except ImportError:
+        pass
+    try:
+        from importlib.metadata import version
+        return f"mlcflow {version('mlcflow')}"
+    except Exception:
+        return "mlcflow (unknown version)"
+
+
+def _get_repo_hashes():
+    """Get git info for all repos. Returns list of (alias, branch, hash, has_local_changes)."""
+    import subprocess
+    if default_parent is None:
+        return []
+    results = []
+    for repo in default_parent.repos:
+        alias = os.path.basename(repo.path)
+        git_dir = os.path.join(repo.path, '.git')
+        if not os.path.isdir(git_dir):
+            continue
+        try:
+            commit = subprocess.check_output(
+                ["git", "-C", repo.path, "rev-parse", "--short", "HEAD"],
+                stderr=subprocess.DEVNULL, text=True
+            ).strip()
+            branch = subprocess.check_output(
+                ["git", "-C", repo.path, "rev-parse", "--abbrev-ref", "HEAD"],
+                stderr=subprocess.DEVNULL, text=True
+            ).strip()
+            # Only tracked file changes (ignore untracked files)
+            dirty = subprocess.check_output(
+                ["git", "-C", repo.path, "status", "--porcelain", "-uno"],
+                stderr=subprocess.DEVNULL, text=True
+            ).strip()
+            results.append((alias, branch, commit, bool(dirty)))
+        except Exception:
+            pass
+    return results
+
+
+def _report_error(e):
+    import traceback
+    from .script_action import ScriptExecutionError
+
+    # Log the error with target context
+    etype = type(e).__name__ if not isinstance(e, ScriptExecutionError) else ''
+    prefix = f'{etype}: ' if etype else ''
+    if _current_target:
+        logger.error(f"Error during '{_current_target}' action: {prefix}{e}")
+    else:
+        logger.error(f"{prefix}{e}")
+
+    # Show the last traceback frame from outside the mlcflow package
+    tb = traceback.extract_tb(e.__traceback__)
+    if tb:
+        _mlc_pkg_dir = os.path.dirname(os.path.abspath(__file__))
+        # Prefer the last frame outside the mlcflow package
+        last = tb[-1]
+        for frame in reversed(tb):
+            if not os.path.abspath(frame.filename).startswith(_mlc_pkg_dir):
+                last = frame
+                break
+        logger.error(f"  at {last.filename}:{last.lineno} in {last.name}")
+
+    # For script execution errors, show actionable info
+    if isinstance(e, ScriptExecutionError):
+        script_name = e.script_name
+        repo_alias = e.repo_alias
+        run_args = e.run_args
+
+        if script_name:
+            # Build rerun command with user-facing inputs only
+            rerun_parts = ["mlcr", script_name]
+            _skip_keys = {
+                'mlc_run_cmd', 'tags', 'details', 'path_only', 'p',
+                'action', 'target', 'rebuild', 'env', 'script_tags',
+                'run_cmd', 'run_final_cmds', 'skip_run_cmd', 'run_cmd_prefix',
+                'add_deps_recursive', 'add_deps', 'file_path',
+                'quiet', 'real_run', 'fake_run_deps', 'keep_detached',
+                'pass_user_group', 'use_host_group_id', 'use_host_user_id',
+                'extra_run_args', 'port_maps', 'mounts', 'pre_run_cmds',
+                'docker_run_deps',
+            }
+            for k, v in run_args.items():
+                if k in _skip_keys:
+                    continue
+                if isinstance(v, (dict, list)):
+                    continue
+                if k.startswith('MLC_') or k.startswith('mlc_'):
+                    continue
+                rerun_parts.append(f"--{k}={v}")
+            rerun_cmd = " ".join(rerun_parts)
+            logger.error(f"Failed script: {script_name}")
+            logger.error(f"To rerun just the failed part: {rerun_cmd}")
+
+        if e.version_info_file:
+            logger.error(f"Dependency versions: {e.version_info_file}")
+
+        # Derive issues URL from repo alias
+        issues_url = 'https://github.com/mlcommons/mlperf-automations/issues'
+        if repo_alias and '@' in repo_alias:
+            issues_url = 'https://github.com/' + \
+                repo_alias.replace('@', '/') + '/issues'
+        logger.error(
+            f"Please file an issue at {issues_url} with the full console log.")
+
+    # Show version and repo commit hashes for debugging
+    logger.error(f"{get_version_info()}")
+    repo_hashes = _get_repo_hashes()
+    if repo_hashes:
+        for alias, branch, commit, dirty in repo_hashes:
+            marker = " (local changes)" if dirty else ""
+            logger.error(f"  {alias}: {branch} {commit}{marker}")
 
 
 def mlc_expand_short(action, target="script"):
@@ -90,17 +211,13 @@ def mlc_expand_short(action, target="script"):
     # Call the main function
     try:
         main()
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+        sys.exit(1)
     except SystemExit:
         raise
     except Exception as e:
-        import traceback
-        tb = traceback.extract_tb(e.__traceback__)
-        if tb:
-            last = tb[-1]
-            logger.error(f"{e}")
-            logger.error(f"  at {last.filename}:{last.lineno} in {last.name}")
-        else:
-            logger.error(f"{e}")
+        _report_error(e)
         sys.exit(1)
 
 
@@ -112,12 +229,20 @@ def mlcd():
     mlc_expand_short("docker")
 
 
-def mlcdr():
-    mlc_expand_short("docker")
+def mlca():
+    mlc_expand_short("apptainer")
 
 
 def mlcrr():
     mlc_expand_short("remote-run")
+
+
+def mlcre():
+    mlc_expand_short("remote-experiment")
+
+
+def mlcrd():
+    mlc_expand_short("remote-docker")
 
 
 def mlce():
@@ -142,6 +267,13 @@ def process_console_output(res, target, action, run_args):
             if not run_args.get('path_only'):
                 logger.warning(
                     f"""No {target} entry found for the specified input: {run_args}!""")
+                logger.info(
+                    "Tip: Run 'mlc pull repo' to fetch the latest upstream changes.")
+                repo_hashes = _get_repo_hashes()
+                for alias, branch, commit, dirty in repo_hashes:
+                    if dirty:
+                        logger.warning(
+                            f"Repo '{alias}' ({branch}) has local changes - 'mlc pull repo' may fail. Commit or stash changes first.")
         else:
             for item in res['list']:
                 if run_args.get('path_only'):
@@ -245,8 +377,9 @@ def build_parser(pre_args):
     reindex_parser.add_argument('extra', nargs=argparse.REMAINDER)
 
     # Script-only
-    for action in ['docker', 'docker-run',
-                   'experiment', 'remote-run', 'doc', 'lint']:
+    for action in ['docker', 'docker-run', 'apptainer',
+                   'experiment', 'remote-run', 'remote-experiment',
+                   'remote-docker', 'doc', 'lint']:
         p = subparsers.add_parser(action, add_help=False)
         p.add_argument('target', choices=['script', 'run'])
         p.add_argument(
@@ -286,8 +419,9 @@ def build_run_args(args):
     if args.command in ['pull', 'rm', 'add', 'find'] and args.target == "repo":
         run_args['repo'] = args.details
 
-    if args.command in ['docker', 'docker-run', 'experiment',
-                        'remote-run', 'doc', 'lint'] and args.target == "run":
+    if args.command in ['docker', 'docker-run', 'apptainer', 'experiment',
+                        'remote-run', 'remote-experiment',
+                        'remote-docker', 'doc', 'lint'] and args.target == "run":
         # run_args['target'] = 'script' #dont modify this as script might have
         # target as in input
         args.target = "script"
@@ -386,6 +520,12 @@ def main():
     check_raw_arguments_for_non_ascii()
     convert_hyphen_to_underscore_in_args()
 
+    # Handle version before argparse to avoid --version conflicting with
+    # script arguments like --version=3.4
+    if len(sys.argv) >= 2 and sys.argv[1] in ('--version', '-V', 'version'):
+        print(get_version_info())
+        sys.exit(0)
+
     pre_parser = build_pre_parser()
     pre_args, remaining_args = pre_parser.parse_known_args()
 
@@ -404,7 +544,8 @@ def main():
     if pre_args.help and not "tags" in run_args:
         help_text = ""
         if pre_args.target == "run":
-            if pre_args.action.startswith("docker"):
+            if pre_args.action.startswith(
+                    "docker") or pre_args.action == "apptainer":
                 pre_args.target = "script"
             else:
                 logger.error(
@@ -456,6 +597,9 @@ def main():
         logging.error("Error: No command specified.")
         sys.exit(1)
 
+    global _current_target
+    _current_target = args.target
+
     action = get_action(args.target, default_parent)
 
     if not action or not hasattr(action, args.command):
@@ -477,15 +621,11 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+        sys.exit(1)
     except SystemExit:
         raise
     except Exception as e:
-        import traceback
-        tb = traceback.extract_tb(e.__traceback__)
-        if tb:
-            last = tb[-1]
-            logger.error(f"{e}")
-            logger.error(f"  at {last.filename}:{last.lineno} in {last.name}")
-        else:
-            logger.error(f"{e}")
+        _report_error(e)
         sys.exit(1)
