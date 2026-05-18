@@ -17,7 +17,7 @@ set -euo pipefail
 # ------------------------------------------------------------------------------
 
 MIN_PYTHON_VERSION="3.7"
-DEFAULT_VENV_DIR="$HOME/.mlcflow_venv"
+DEFAULT_VENV_DIR="$HOME/mlcflow"
 DEFAULT_REPO="mlcommons@mlperf-automations"
 DEFAULT_BRANCH="dev"
 
