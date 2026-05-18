@@ -17,7 +17,7 @@ This installer provides a **one-command setup** for the MLCFlow package and the 
 
 **After installation, activate the virtual environment** to use MLCFlow commands:
 ```bash
-source ~/.mlcflow/bin/activate
+source ~/mlcflow/bin/activate
 ```
 
 ## Supported Platforms
@@ -75,7 +75,7 @@ source ~/.mlcflow/bin/activate
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │ 5. Create Virtual Environment                              │
-│    - Location: ~/.mlcflow (or custom)                 │
+│    - Location: ~/mlcflow (or custom)                 │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -147,7 +147,7 @@ bash mlcflow_linux.sh --yes --quiet
 |----------|-------------|---------|
 | `--yes` | Auto-confirm all prompts (non-interactive mode) | Interactive |
 | `--upgrade` | Upgrade mlcflow if already installed | Skip if present |
-| `--venv-dir <path>` | Custom virtual environment directory | `~/.mlcflow` |
+| `--venv-dir <path>` | Custom virtual environment directory | `~/mlcflow` |
 | `--mlc-repo <repo>` | Repository in format `owner@repo` | `mlcommons@mlperf-automations` |
 | `--mlc-repo-branch <branch>` | Git branch to clone | `dev` |
 | `--install-python` | Auto-install Python if incompatible | Prompt user |
@@ -227,7 +227,7 @@ Based on this detection, it chooses the appropriate execution method.
 
 ```bash
 # Activate the virtual environment
-source ~/.mlcflow/bin/activate
+source ~/mlcflow/bin/activate
 
 # Your prompt should change to show (mlcflow) or similar
 ```
@@ -251,7 +251,7 @@ deactivate
 ```
 
 ### File Locations
-- **Virtual Environment**: `~/.mlcflow` (or custom path)
+- **Virtual Environment**: `~/mlcflow` (or custom path)
 - **Automation Repository**: `~/MLC/repos/mlcommons@mlperf-automations/`
 - **MLC Cache**: `~/MLC/repos/`
 
@@ -277,7 +277,7 @@ bash mlcflow_linux.sh --yes
 **Solution**:
 ```bash
 # Activate the virtual environment
-source ~/.mlcflow/bin/activate
+source ~/mlcflow/bin/activate
 
 # Now mlc command should be available
 mlc --help
