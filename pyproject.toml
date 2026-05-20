@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mlcflow"
-version = "1.1.18"
+version = "1.2.2"
 
 description = "An automation interface tailored for CPU/GPU benchmarking"
 authors = [
@@ -24,7 +24,8 @@ dependencies = [
     "requests",
     "pyyaml",
     "giturlparse",
-    "colorama"
+    "colorama",
+    "filelock"
 ]
 
 [project.urls]
@@ -44,9 +45,13 @@ py-modules = []
 
 [project.scripts]
 mlc = "mlc.main:main"
+mlcflow = "mlc.main:main"
 mlcr = "mlc.main:mlcr"
 mlcrr = "mlc.main:mlcrr"
 mlcd = "mlc.main:mlcd"
+mlca = "mlc.main:mlca"
 mlce = "mlc.main:mlce"
 mlct = "mlc.main:mlct"
 mlcp = "mlc.main:mlcp"
+mlcre = "mlc.main:mlcre"
+mlcrd = "mlc.main:mlcrd"
