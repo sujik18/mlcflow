@@ -39,7 +39,7 @@ jobs:
         cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
         chmod 600 ~/.ssh/authorized_keys
 
-        # Start sshd if not running
+        # Start sshd
         sudo systemctl start ssh || sudo service ssh start || true
 
         # Accept localhost host key
@@ -53,16 +53,14 @@ jobs:
         mlcrr detect-os \
           --remote_host=localhost \
           --remote_ssh_key_file=~/.ssh/id_ed25519 \
-          --remote_skip_host_verify=yes \
-          --remote_python_venv=$HOME/.mlcflow_venv
+          --remote_skip_host_verify=yes
 
     - name: Test 2 - remote-run with tags
       run: |
         mlc remote-run script --tags=detect,os \
           --remote_host=localhost \
           --remote_ssh_key_file=~/.ssh/id_ed25519 \
-          --remote_skip_host_verify=yes \
-          --remote_python_venv=$HOME/.mlcflow_venv
+          --remote_skip_host_verify=yes
 
     - name: Test 3 - remote-docker help (smoke test)
       run: |
