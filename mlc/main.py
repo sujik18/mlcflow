@@ -574,11 +574,13 @@ def main():
                     help_text += method.__doc__
         elif pre_args.action and pre_args.target:
             actions = get_action(pre_args.target, default_parent)
+            action_name = pre_args.action.replace("-", "_")
             try:
-                method = getattr(actions, pre_args.action)
+                method = getattr(actions, action_name)
                 help_text += actions.__doc__
-                help_text += method.__doc__
-            except BaseException:
+                if method.__doc__:
+                    help_text += method.__doc__
+            except AttributeError:
                 logger.error(
                     f"Error: '{pre_args.action}' is not supported for {pre_args.target}.")
         if help_text != "":
