@@ -86,11 +86,6 @@ class ActionInvalidMetaSearchTest(unittest.TestCase):
         self.assertEqual(len(res["list"]), 0)
 
     def test_search_alias_lookup_skips_item_with_invalid_meta(self):
-        """
-        add() writes a valid entry; we then corrupt meta.json in-place so the
-        index entry still exists but Item.meta loads as a non-dict.
-        The fixed _item_from_index_entry must skip it.
-        """
         action = self._new_action()
         add_res = action.add({
             "target_name": "cache",
@@ -99,7 +94,7 @@ class ActionInvalidMetaSearchTest(unittest.TestCase):
         })
         self.assertEqual(add_res["return"], 0)
 
-        # Write a non-dict value so meta.json exists but is invalid.
+        # Corrupt meta.json into a non-dict so it fails verification lookup
         with open(os.path.join(add_res["path"], "meta.json"), "w") as f:
             json.dump([], f)
 
@@ -127,29 +122,9 @@ class ActionInvalidMetaSearchTest(unittest.TestCase):
     def test_search_meta_validation_prevents_corrupt_items_in_alias_path(self):
         """
         Regression test for the Whisper inference stale-folder bug.
-
-        Real scenario
-        -------------
-        1. action.add() creates the cache folder, writes meta.json, and persists
-           an index entry (uid, alias, path, repo) to the on-disk index JSON.
-        2. The download is killed mid-way; meta.json ends up absent and only
-           mlc_temp_cache.json remains on disk.
-        3. On the next run the index JSON is loaded from disk — the stale entry
-           is still there.  The filesystem scanner is NOT re-run for entries that
-           already exist in the mtime cache, so the corrupt entry survives.
-        4. search() finds the entry and tries to build an Item from it.
-
-        Old code (no guard): directly appended Item(path, repo) → meta is None
-                             → caller crashes on item.meta["key"].
-        Fixed code:          _item_from_index_entry checks isinstance(meta, dict),
-                             logs a warning, and returns None → item is skipped.
-
-        The stale entry is injected directly into the in-memory index to bypass
-        the filesystem scanner (which would otherwise discard the folder during
-        the index rebuild and hide the bug).
-
-        This test FAILS on old code (len == 1, corrupt item leaks through) and
-        PASSES on fixed code (len == 0, item skipped by meta validation guard).
+        Regression test for the Whisper dataset stale-folder bug.
+        Simulates a crashed/incomplete download where the index entry persists but meta.json is missing, 
+        ensuring the search guard safely skips it.
         """
         action = self._new_action()
 
